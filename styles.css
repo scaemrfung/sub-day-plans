@@ -146,7 +146,7 @@ input:focus, textarea:focus, select:focus, button:focus-visible { outline: 2px s
 
 .readonly-bar { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; background: #fff4e5; border-bottom: 1px solid #f5c98a; padding: 12px 28px; font-size: 14px; }
 .readonly-bar span { color: var(--muted); margin-left: 4px; }
-.ro-actions { display: flex; gap: 8px; }
+.ro-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 dialog { border: 1px solid var(--line); border-radius: 18px; padding: 0; max-width: min(640px, 94vw); width: 100%; box-shadow: 0 20px 60px rgba(12,39,68,.25); color: var(--fg); }
 dialog::backdrop { background: rgba(12, 39, 68, .35); }
@@ -245,4 +245,7 @@ body.readonly .print-view { display: block; background: #fff; border: 1px solid 
   .pv-grid { grid-template-columns: 1fr; }
   .pv-table td.pv-time { width: auto; }
   .pv-table td.pv-cls { width: auto; }
+  .pv-table td.pv-time { white-space: normal; width: 52px; }
+  .pv-table td { overflow-wrap: anywhere; }
+  .pv-two { width: auto; }
 }

@@ -12,6 +12,7 @@ Plain HTML/CSS/JS. No frameworks, no sign-in, no tracking, no server.
 | `index.html` | The page (editor, read-only share view, print layout) |
 | `schedule.js` | **Default weekly timetable.** Edit this to change the schedule for everyone |
 | `app.js` | All behaviour: autosave, copy/template, print, share links, schedule editor |
+| `export.js` | **Download PDF / Download Word.** Builds a real Letter-size PDF (built-in Helvetica) and a real .docx (hand-written OOXML zip) in the browser. No libraries, no CDN |
 | `styles.css`, `palette.css` | Same look as the other lesson sites (colour bar, cards, "Updated … MT" stamp) |
 
 ## Where the default schedule comes from
@@ -23,6 +24,9 @@ Plain HTML/CSS/JS. No frameworks, no sign-in, no tracking, no server.
 - **Library supervision duty** is during the middle recess Tuesday to Friday (none on Monday): 11:55–12:15, or 11:52–12:17 on Wednesday. It's set on that recess block (`duty`, room "Library") and in each day's `duties`, which fills in the Duties box on a new plan. Printouts show it in a boxed "Duties" note at the top and a bold DUTY row.
 
 To bake in changes made on the site: **Weekly schedule → Export JSON**, then paste the JSON after `window.DEFAULT_SCHEDULE =` in `schedule.js`.
+
+## Downloads
+**Download PDF** and **Download Word** sit next to Print, and in the read-only share view too. Files are named like `Sub-Plan-Mr-Fung-2026-10-05-Monday.pdf` / `.docx`; if no date is set, the date is left out. Both include the day header, the boxed duties warning, the day fields, and a Time / Class / Plan table with the combined-class tags and the DUTY row. In the PDF, long plans wrap and continue onto the next page, and the table header repeats. Emoji can't be shown with the built-in PDF fonts, so they're left out of the PDF (⚠ prints as "!"); the Word file keeps them.
 
 ## Where data is kept
 - Plans save automatically in the browser's `localStorage` (keys start with `sdp:v1:`), one plan per weekday. There's also one template and your edited schedule.
