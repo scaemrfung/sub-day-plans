@@ -2,7 +2,7 @@
 
 Live: https://scaemrfung.github.io/sub-day-plans/
 
-A one-page tool for Mr. Fun (SCA, K–6). You pick a day, see that day's timetable as blocks, fill in the plan for each block, and then **print** it for a substitute or **share** a read-only link.
+A one-page tool for Mr. Fung (SCA, K–6). You pick a day, see that day's timetable as blocks, fill in the plan for each block, and then **print** it for a substitute or **share** a read-only link.
 
 Plain HTML/CSS/JS. No frameworks, no sign-in, no tracking, no server.
 
