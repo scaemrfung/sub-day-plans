@@ -469,6 +469,11 @@
 
   /* ---------- PDF / Word downloads (export.js builds the files) ---------- */
   var BACKUP_TEXT = "No-gym warm-ups: scaemrfung.github.io/pe-playbook/warmup-nogym.html (Ship Ahoy, Bell Bounce) · Grade 1 Music practice studio: scaemrfung.github.io/Grade-1-Music/studio/";
+  var BACKUP_SEGS = [
+    { t: "No-gym warm-ups: " }, { t: "PE Warm Up Games (Ship Ahoy, Bell Bounce)", url: SITES.warmup.url },
+    { t: " · Big-group games: " }, { t: "PE Playbook games", url: BASE + "/pe-playbook/games.html" },
+    { t: " · Grade 1 Music: " }, { t: "Practice studio", url: SITES.studio.url }
+  ];
   function slug(s) { return String(s || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
   function planModel(day, blocks, p) {
     var title = p.date ? fmtDate(p.date) : DAY_LONG[day] || "Sub plan";
@@ -488,7 +493,15 @@
       if (bp.materials) plan.push({ k: "Materials:", v: bp.materials });
       if (bp.instructions) plan.push({ k: "Instructions:", v: bp.instructions });
       var ls = linkLines(bp.links);
-      if (ls.length) plan.push({ k: "Links:", v: ls.map(function (l) { var u = safeUrl(l.url) || l.url; return (l.label ? l.label + " — " : "") + u.replace(/^https?:\/\//, ""); }).join(" · ") });
+      if (ls.length) {
+        var segs = [];
+        ls.forEach(function (l, i) {
+          var u = safeUrl(l.url);
+          if (i) segs.push({ t: " · " });
+          segs.push({ t: l.label || (u || l.url).replace(/^https?:\/\//, ""), url: u });
+        });
+        plan.push({ k: "Links:", segs: segs, v: "" });
+      }
       if (bp.notes) plan.push({ k: "Notes:", v: bp.notes });
       if (!plan.length) plan.push({ v: "No plan entered — use a no-prep backup (see bottom)." });
       return {
@@ -505,7 +518,7 @@
       kicker: "Substitute plan · SCA", title: title, teacher: p.teacher || "", sub: p.sub || "",
       duties: p.duties || "",
       info: [{ label: "Bell times", value: p.bells }, { label: "Emergency / fire exit", value: p.emergency }, { label: "Helpful staff", value: p.contacts }, { label: "Students to know about", value: p.needs }],
-      rows: rows, endNotes: p.endNotes || "", backup: BACKUP_TEXT,
+      rows: rows, endNotes: p.endNotes || "", backup: BACKUP_SEGS,
       thanks: "Thank you! Please leave this sheet on the desk.",
       footer: "Sub plan · " + title + " · " + who
     };
