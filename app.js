@@ -138,12 +138,29 @@
   var schedDay = currentDay;
   var plan = null;
 
+  // Teacher name. Older saves used a misspelled default (the name without the final "g");
+  // it is fixed on load, but only when the Teacher field is exactly that old default.
+  var TEACHER = "Mr. Fung", OLD_TEACHER = TEACHER.slice(0, -1);
   function emptyPlan(day) {
     var sd = schedule.days[day] || {};
-    return { date: "", teacher: "Mr. Fun", sub: "", duties: sd.duties || "", bells: (schedule.days[day] && schedule.days[day].bells) || "", needs: "", emergency: "", contacts: "", endNotes: "", blocks: {} };
+    return { date: "", teacher: TEACHER, sub: "", duties: sd.duties || "", bells: (schedule.days[day] && schedule.days[day].bells) || "", needs: "", emergency: "", contacts: "", endNotes: "", blocks: {} };
   }
+  function fixTeacher(o) { if (o && o.teacher === OLD_TEACHER) { o.teacher = TEACHER; return true; } return false; }
+  (function migrateTeacher() {
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k || k.indexOf(LS) !== 0) continue;
+        var name = k.slice(LS.length);
+        if (name.indexOf("day:") !== 0 && name !== "template") continue;
+        var o = lsGet(name, null);
+        if (fixTeacher(o)) lsSet(name, o);
+      }
+    } catch (e) {}
+  })();
   function loadPlan(day) {
     var p = lsGet("day:" + day, null);
+    if (p && fixTeacher(p)) lsSet("day:" + day, p);
     if (!p) p = emptyPlan(day);
     if (!p.blocks) p.blocks = {};
     return p;
@@ -302,6 +319,8 @@
     });
 
     $("#btnPrint").addEventListener("click", function () { savePlanNow(); renderPrint(); window.print(); });
+    $("#btnPdf").addEventListener("click", function () { savePlanNow(); exportFile("pdf", currentDay, schedule.days[currentDay].blocks, plan); });
+    $("#btnDocx").addEventListener("click", function () { savePlanNow(); exportFile("docx", currentDay, schedule.days[currentDay].blocks, plan); });
     $("#btnShare").addEventListener("click", openShare);
     $("#copyFrom").addEventListener("change", function () {
       var from = this.value; this.value = "";
@@ -405,8 +424,60 @@
       '<section class="pv-grid">' + box("⚠ Duties — please don’t miss", p.duties, "pv-duty-box") + box("Bell times", p.bells) + box("Emergency / fire exit", p.emergency) +
       box("Helpful staff", p.contacts) + box("Students to know about", p.needs) + "</section>" +
       '<table class="pv-table"><thead><tr><th>Time</th><th>Class</th><th>Plan</th></tr></thead><tbody>' + rows + "</tbody></table>" + end +
-      '<div class="pv-backup"><span class="pv-label">If a plan falls through</span>No-gym warm-ups: scaemrfung.github.io/pe-playbook/warmup-nogym.html (Ship Ahoy, Bell Bounce) · Grade 1 Music practice studio: scaemrfung.github.io/Grade-1-Music/studio/</div>' +
+      '<div class="pv-backup"><span class="pv-label">If a plan falls through</span>' + esc(BACKUP_TEXT) + '</div>' +
       '<div class="pv-note">Thank you! Please leave this sheet on the desk.</div>';
+  }
+
+  /* ---------- PDF / Word downloads (export.js builds the files) ---------- */
+  var BACKUP_TEXT = "No-gym warm-ups: scaemrfung.github.io/pe-playbook/warmup-nogym.html (Ship Ahoy, Bell Bounce) · Grade 1 Music practice studio: scaemrfung.github.io/Grade-1-Music/studio/";
+  function slug(s) { return String(s || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
+  function planModel(day, blocks, p) {
+    var title = p.date ? fmtDate(p.date) : DAY_LONG[day] || "Sub plan";
+    var rows = blocks.map(function (b) {
+      var bp = (p.blocks || {})[blockKey(b)] || {};
+      var time = b.start + "–" + b.end;
+      if (b.duty) {
+        var dp = [{ v: "⚠ " + b.duty.toUpperCase() + (b.room ? " — " + b.room.toUpperCase() : ""), strong: true, color: "red" }];
+        if (bp.notes) dp.push({ v: bp.notes });
+        return { kind: "duty", time: time, cls: b.subject || "Recess", tags: ["Duty"], plan: dp };
+      }
+      if (isMinor(b)) {
+        return { kind: "minor", time: time, cls: b.subject || (b.type === "prep" ? "Prep" : "Break"), plan: [{ v: bp.notes || (b.type === "prep" ? "Prep — no class" : "") }] };
+      }
+      var plan = [];
+      if (bp.lesson) plan.push({ v: bp.lesson, strong: true });
+      if (bp.materials) plan.push({ k: "Materials:", v: bp.materials });
+      if (bp.instructions) plan.push({ k: "Instructions:", v: bp.instructions });
+      var ls = linkLines(bp.links);
+      if (ls.length) plan.push({ k: "Links:", v: ls.map(function (l) { var u = safeUrl(l.url) || l.url; return (l.label ? l.label + " — " : "") + u.replace(/^https?:\/\//, ""); }).join(" · ") });
+      if (bp.notes) plan.push({ k: "Notes:", v: bp.notes });
+      if (!plan.length) plan.push({ v: "No plan entered — use a no-prep backup (see bottom)." });
+      return {
+        kind: "class", time: time, cls: classLabel(b) || b.subject || "",
+        tags: b.with ? ["Two classes · combined in " + (b.room || "gym").toLowerCase()] : [],
+        sub: [(b.cls ? b.subject || "" : "") + (b.room ? (b.cls && b.subject ? " · " : "") + b.room : "")].filter(Boolean),
+        orig: b.orig || "", combined: !!b.with, plan: plan
+      };
+    });
+    var who = p.teacher || TEACHER;
+    return {
+      fileBase: ["Sub-Plan", slug(who), p.date || "", DAY_LONG[day] || ""].filter(Boolean).join("-"),
+      docTitle: "Sub plan · " + title + " · " + who,
+      kicker: "Substitute plan · SCA", title: title, teacher: p.teacher || "", sub: p.sub || "",
+      duties: p.duties || "",
+      info: [{ label: "Bell times", value: p.bells }, { label: "Emergency / fire exit", value: p.emergency }, { label: "Helpful staff", value: p.contacts }, { label: "Students to know about", value: p.needs }],
+      rows: rows, endNotes: p.endNotes || "", backup: BACKUP_TEXT,
+      thanks: "Thank you! Please leave this sheet on the desk.",
+      footer: "Sub plan · " + title + " · " + who
+    };
+  }
+  function exportFile(kind, day, blocks, p) {
+    if (!window.SubExport) { toast("Download isn’t ready yet — reload the page and try again"); return; }
+    try {
+      var m = planModel(day, blocks, p);
+      if (kind === "pdf") { var n = window.SubExport.pdf(m); toast("Downloaded " + m.fileBase + ".pdf (" + n + (n === 1 ? " page)" : " pages)")); }
+      else { window.SubExport.docx(m); toast("Downloaded " + m.fileBase + ".docx"); }
+    } catch (e) { toast("Couldn’t make the file: " + e.message); }
   }
 
   /* ---------- share links (deflate-raw + base64url in the hash) ---------- */
@@ -481,8 +552,11 @@
       if (!data || !data.s || !data.p) throw new Error("bad data");
       var blocks = data.s.map(function (a) { return { start: a[0], end: a[1], cls: a[2], subject: a[3], room: a[4], type: a[5], with: a[6] || "", orig: a[7] || "", duty: a[8] || "" }; });
       data.p.blocks = data.p.blocks || {};
+      fixTeacher(data.p);
       $("#printView").innerHTML = planHTML(data.d, blocks, data.p);
-      document.title = "Sub plan · " + (data.p.date ? fmtDate(data.p.date) : DAY_LONG[data.d] || "") + " · Mr. Fun";
+      $("#roPdf").onclick = function () { exportFile("pdf", data.d, blocks, data.p); };
+      $("#roDocx").onclick = function () { exportFile("docx", data.d, blocks, data.p); };
+      document.title = "Sub plan · " + (data.p.date ? fmtDate(data.p.date) : DAY_LONG[data.d] || "") + " · " + TEACHER;
     }).catch(function () {
       $("#printView").innerHTML = '<h2>This share link is damaged</h2><p>Part of the link may have been cut off when it was sent. Ask for the link again, or ask for a printed copy.</p>';
     });
