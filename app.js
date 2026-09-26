@@ -122,6 +122,9 @@
     if (isNaN(d)) return null;
     return ["sun", "mon", "tue", "wed", "thu", "fri", "sat"][d.getDay()];
   }
+  /* Combined PE blocks: a second class in the gym at the same time ("6A (5C)" in the timetable). */
+  function classLabel(b) { return b.with ? b.cls + " + " + b.with : (b.cls || ""); }
+  function combinedNote(b) { return b.with ? "Combined in " + (b.room || "gym").toLowerCase() + " · 2 classes" : ""; }
   function linkLines(links) { return (links || []).filter(function (l) { return l && l.url; }); }
 
   /* ---------- state ---------- */
@@ -136,7 +139,8 @@
   var plan = null;
 
   function emptyPlan(day) {
-    return { date: "", teacher: "Mr. Fun", sub: "", duties: "", bells: (schedule.days[day] && schedule.days[day].bells) || "", needs: "", emergency: "", contacts: "", endNotes: "", blocks: {} };
+    var sd = schedule.days[day] || {};
+    return { date: "", teacher: "Mr. Fun", sub: "", duties: sd.duties || "", bells: (schedule.days[day] && schedule.days[day].bells) || "", needs: "", emergency: "", contacts: "", endNotes: "", blocks: {} };
   }
   function loadPlan(day) {
     var p = lsGet("day:" + day, null);
@@ -210,9 +214,17 @@
       var bp = blockPlan(plan, b);
       var subj = esc(b.subject || "");
       var side = '<div class="block-side"><div class="block-time">' + esc(b.start) + "–" + esc(b.end) + "</div>" +
-        '<div class="block-class">' + (b.cls ? esc(b.cls) : subj) + "</div>" +
+        '<div class="block-class">' + (b.cls ? esc(classLabel(b)) : subj) + "</div>" +
+        (b.with ? '<div class="block-combined"><span class="badge combined-badge">' + esc(combinedNote(b)) + "</span></div>" : "") +
+        (b.duty ? '<div class="block-subject"><span class="badge duty-badge">DUTY</span></div>' : "") +
         (b.cls && subj ? '<div class="block-subject"><span class="badge subj-' + subj.replace(/\W/g, "") + '">' + subj + "</span></div>" : "") +
-        (b.room ? '<div class="block-room">📍 ' + esc(b.room) + "</div>" : "") + "</div>";
+        (b.room ? '<div class="block-room">📍 ' + esc(b.room) + "</div>" : "") +
+        (b.orig ? '<div class="block-orig">Timetable: ' + esc(b.orig) + "</div>" : "") + "</div>";
+      if (b.duty) {
+        return '<div class="block minor duty" data-idx="' + i + '">' + side + '<div class="block-body">' +
+          '<div class="duty-flag">⚠ DUTY: ' + esc(b.duty) + (b.room ? " · " + esc(b.room) : "") + "</div>" +
+          '<label class="field"><span>Duty note for the sub</span><input type="text" data-bf="notes" value="' + esc(bp.notes) + '" placeholder="e.g. Head to the Library as soon as the recess bell goes" /></label></div></div>';
+      }
       if (isMinor(b)) {
         return '<div class="block minor" data-idx="' + i + '">' + side + '<div class="block-body">' +
           '<label class="field"><span>' + (b.type === "prep" ? "Note (prep — no class)" : "Note (e.g. supervision duty)") + '</span><input type="text" data-bf="notes" value="' + esc(bp.notes) + '" placeholder="' + (b.type === "prep" ? "Nothing needed — prep time" : "e.g. Outside supervision, back field") + '" /></label></div></div>';
@@ -325,16 +337,19 @@
   function copyPlanInto(src, srcDay, opts) {
     var keepDate = plan.date;
     DAY_FIELDS.forEach(function (f) {
-      if (f === "bells" && srcDay && srcDay !== currentDay) return; // bells differ per day (e.g. Wednesday)
+      if ((f === "bells" || f === "duties") && srcDay && srcDay !== currentDay) return; // bells and duties differ per day
       if (opts.overwrite || !plan[f]) plan[f] = src[f] || (opts.overwrite ? "" : plan[f]);
     });
-    if (opts.overwrite && srcDay !== currentDay) plan.bells = plan.bells || schedule.days[currentDay].bells || "";
+    if (opts.overwrite && srcDay !== currentDay) {
+      plan.bells = plan.bells || schedule.days[currentDay].bells || "";
+      plan.duties = plan.duties || schedule.days[currentDay].duties || "";
+    }
     var srcBlocks = (schedule.days[srcDay] && schedule.days[srcDay].blocks) || [];
     var used = {};
     schedule.days[currentDay].blocks.forEach(function (b) {
       var k = blockKey(b), from = null;
       if (b.cls) {
-        var m = srcBlocks.filter(function (s) { return s.cls === b.cls && s.subject === b.subject && !used[blockKey(s)]; })[0];
+        var m = srcBlocks.filter(function (s) { return s.cls === b.cls && (s.with || "") === (b.with || "") && s.subject === b.subject && !used[blockKey(s)]; })[0];
         if (m) { from = src.blocks[blockKey(m)]; used[blockKey(m)] = 1; }
       }
       if (!from && src.blocks[k] && !used[k]) { from = src.blocks[k]; }
@@ -354,10 +369,13 @@
 
   function planHTML(day, blocks, p) {
     var title = p.date ? fmtDate(p.date) : DAY_LONG[day] || "Sub plan";
-    function box(label, val) { return val ? "<div><b>" + label + "</b><p>" + esc(val) + "</p></div>" : ""; }
+    function box(label, val, cls) { return val ? "<div" + (cls ? ' class="' + cls + '"' : "") + "><b>" + label + "</b><p>" + esc(val) + "</p></div>" : ""; }
     var rows = blocks.map(function (b) {
       var bp = (p.blocks || {})[blockKey(b)] || {};
       var time = esc(b.start) + "–" + esc(b.end);
+      if (b.duty) {
+        return '<tr class="pv-duty"><td class="pv-time">' + time + '</td><td class="pv-cls"><strong>' + esc(b.subject || "Recess") + '</strong><span class="pv-two">DUTY</span></td><td class="pv-plan"><div class="pv-duty-text">⚠ ' + esc(b.duty) + (b.room ? " — " + esc(b.room) : "") + "</div>" + (bp.notes ? "<div>" + esc(bp.notes) + "</div>" : "") + "</td></tr>";
+      }
       if (isMinor(b)) {
         return '<tr class="pv-minor"><td class="pv-time">' + time + "</td><td>" + esc(b.subject || (b.type === "prep" ? "Prep" : "Break")) + "</td><td>" + (bp.notes ? esc(bp.notes) : (b.type === "prep" ? "Prep — no class" : "")) + "</td></tr>";
       }
@@ -373,14 +391,18 @@
       }).join(" · ") + "</div>");
       if (bp.notes) parts.push('<div><span class="pv-k">Notes:</span> ' + esc(bp.notes) + "</div>");
       if (!parts.length) parts.push('<div class="pv-empty">No plan entered — use a no-prep backup (see bottom).</div>');
-      return '<tr><td class="pv-time">' + time + '</td><td class="pv-cls"><strong>' + esc(b.cls || b.subject) + "</strong>" + (b.cls ? esc(b.subject) : "") + (b.room ? "<br>" + esc(b.room) : "") + '</td><td class="pv-plan">' + parts.join("") + "</td></tr>";
+      var cls = '<strong>' + esc(classLabel(b) || b.subject) + "</strong>" +
+        (b.with ? '<span class="pv-two">TWO CLASSES · combined in ' + esc((b.room || "gym").toLowerCase()) + "</span>" : "") +
+        (b.cls ? esc(b.subject) : "") + (b.room ? " · " + esc(b.room) : "") +
+        (b.orig ? '<span class="pv-orig">Timetable: ' + esc(b.orig) + "</span>" : "");
+      return '<tr' + (b.with ? ' class="pv-combined"' : "") + '><td class="pv-time">' + time + '</td><td class="pv-cls">' + cls + '</td><td class="pv-plan">' + parts.join("") + "</td></tr>";
     }).join("");
     var end = p.endNotes
       ? '<div class="pv-end"><span class="pv-label">End-of-day notes</span><p style="white-space:pre-wrap;margin:2px 0 0;">' + esc(p.endNotes) + "</p></div>"
       : '<div class="pv-end"><span class="pv-label">End-of-day notes from the sub (how it went, absences, follow-ups)</span><div class="pv-lines"><div></div><div></div><div></div></div></div>';
     return '<header class="pv-head"><div><div class="pv-label">Substitute plan · SCA</div><h1>' + esc(title) + "</h1></div>" +
       '<div class="pv-who">' + (p.teacher ? "Teacher: <strong>" + esc(p.teacher) + "</strong><br>" : "") + "Sub: <strong>" + (p.sub ? esc(p.sub) : "________________") + "</strong></div></header>" +
-      '<section class="pv-grid">' + box("Bell times", p.bells) + box("Duties", p.duties) + box("Emergency / fire exit", p.emergency) +
+      '<section class="pv-grid">' + box("⚠ Duties — please don’t miss", p.duties, "pv-duty-box") + box("Bell times", p.bells) + box("Emergency / fire exit", p.emergency) +
       box("Helpful staff", p.contacts) + box("Students to know about", p.needs) + "</section>" +
       '<table class="pv-table"><thead><tr><th>Time</th><th>Class</th><th>Plan</th></tr></thead><tbody>' + rows + "</tbody></table>" + end +
       '<div class="pv-backup"><span class="pv-label">If a plan falls through</span>No-gym warm-ups: scaemrfung.github.io/pe-playbook/warmup-nogym.html (Ship Ahoy, Bell Bounce) · Grade 1 Music practice studio: scaemrfung.github.io/Grade-1-Music/studio/</div>' +
@@ -424,7 +446,7 @@
       if (!empty) used[blockKey(b)] = bp;
     });
     p.blocks = used;
-    return { v: 1, d: currentDay, s: blocks.map(function (b) { return [b.start, b.end, b.cls || "", b.subject || "", b.room || "", b.type || "class"]; }), p: p };
+    return { v: 1, d: currentDay, s: blocks.map(function (b) { return [b.start, b.end, b.cls || "", b.subject || "", b.room || "", b.type || "class", b.with || "", b.orig || "", b.duty || ""]; }), p: p };
   }
   function openShare() {
     savePlanNow();
@@ -457,7 +479,7 @@
     $("#roEditor").addEventListener("click", function (e) { e.preventDefault(); location.href = location.pathname; });
     decodeShare(code).then(function (data) {
       if (!data || !data.s || !data.p) throw new Error("bad data");
-      var blocks = data.s.map(function (a) { return { start: a[0], end: a[1], cls: a[2], subject: a[3], room: a[4], type: a[5] }; });
+      var blocks = data.s.map(function (a) { return { start: a[0], end: a[1], cls: a[2], subject: a[3], room: a[4], type: a[5], with: a[6] || "", orig: a[7] || "", duty: a[8] || "" }; });
       data.p.blocks = data.p.blocks || {};
       $("#printView").innerHTML = planHTML(data.d, blocks, data.p);
       document.title = "Sub plan · " + (data.p.date ? fmtDate(data.p.date) : DAY_LONG[data.d] || "") + " · Mr. Fun";
@@ -473,18 +495,21 @@
     }).join("");
     var d = schedule.days[schedDay];
     $("#schedBells").value = d.bells || "";
+    $("#schedDuties").value = d.duties || "";
     var types = [["class", "Class"], ["prep", "Prep"], ["break", "Recess/lunch"]];
     $("#schedTable tbody").innerHTML = d.blocks.map(function (b, i) {
       return '<tr data-row="' + i + '">' +
         '<td class="t"><input type="text" data-sf="start" value="' + esc(b.start) + '" aria-label="Start time" /></td>' +
         '<td class="t"><input type="text" data-sf="end" value="' + esc(b.end) + '" aria-label="End time" /></td>' +
         '<td><input type="text" data-sf="cls" value="' + esc(b.cls) + '" aria-label="Class or grade" /></td>' +
+        '<td><input type="text" data-sf="with" value="' + esc(b.with) + '" placeholder="—" aria-label="Second class in the gym (combined)" title="' + esc(b.orig ? "Timetable: " + b.orig : "") + '" /></td>' +
         '<td><input type="text" data-sf="subject" value="' + esc(b.subject) + '" aria-label="Subject" /></td>' +
         '<td><input type="text" data-sf="room" value="' + esc(b.room) + '" aria-label="Room" /></td>' +
+        '<td><input type="text" data-sf="duty" value="' + esc(b.duty) + '" placeholder="—" aria-label="Supervision duty" /></td>' +
         '<td><select data-sf="type" aria-label="Type">' + types.map(function (t) { return '<option value="' + t[0] + '"' + (b.type === t[0] ? " selected" : "") + ">" + t[1] + "</option>"; }).join("") + "</select></td>" +
         '<td><select data-sf="link" aria-label="Suggested site"><option value="">—</option>' + SITE_ORDER.map(function (k) { return '<option value="' + k + '"' + (b.link === k ? " selected" : "") + ">" + esc(SITES[k].label) + "</option>"; }).join("") + "</select></td>" +
         '<td class="act"><button type="button" class="icon-btn" data-sact="up" aria-label="Move up">↑</button> <button type="button" class="icon-btn" data-sact="down" aria-label="Move down">↓</button> <button type="button" class="icon-btn" data-sact="del" aria-label="Delete block">✕</button></td></tr>';
-    }).join("") || '<tr><td colspan="8" class="hint">No blocks. Use “+ Add block”.</td></tr>';
+    }).join("") || '<tr><td colspan="10" class="hint">No blocks. Use “+ Add block”.</td></tr>';
     var src = schedule.source || (window.DEFAULT_SCHEDULE && window.DEFAULT_SCHEDULE.source);
     $("#scheduleSource").textContent = (lsGet("schedule", null) ? "Edited in this browser. " : "Default from schedule.js. ") + (src ? "Loaded from " + src + "." : "");
   }
@@ -518,6 +543,7 @@
       scheduleChanged();
     });
     $("#schedBells").addEventListener("input", function () { schedule.days[schedDay].bells = this.value; saveSchedule(); });
+    $("#schedDuties").addEventListener("input", function () { schedule.days[schedDay].duties = this.value; saveSchedule(); });
     $("#btnAddBlock").addEventListener("click", function () {
       var list = schedule.days[schedDay].blocks, last = list[list.length - 1];
       list.push({ start: last ? last.end : "8:37", end: "", cls: "", subject: "", room: "", type: "class" });
@@ -553,7 +579,7 @@
           var d = obj.days[k] || { blocks: [] };
           if (!Array.isArray(d.blocks)) throw new Error(k + ".blocks must be a list");
           d.label = d.label || DAY_LONG[k];
-          d.blocks = d.blocks.map(function (b) { return { start: String(b.start || ""), end: String(b.end || ""), cls: String(b.cls || ""), subject: String(b.subject || ""), room: String(b.room || ""), type: ["class", "prep", "break"].indexOf(b.type) >= 0 ? b.type : "class", link: SITES[b.link] ? b.link : "" }; });
+          d.blocks = d.blocks.map(function (b) { return { start: String(b.start || ""), end: String(b.end || ""), cls: String(b.cls || ""), with: String(b.with || ""), orig: String(b.orig || ""), subject: String(b.subject || ""), room: String(b.room || ""), duty: String(b.duty || ""), type: ["class", "prep", "break"].indexOf(b.type) >= 0 ? b.type : "class", link: SITES[b.link] ? b.link : "" }; });
           obj.days[k] = d;
         });
         schedule = obj; scheduleChanged(); $("#importDialog").close(); toast("Schedule imported");
@@ -573,7 +599,7 @@
     refreshBackupSelects();
   }
   function refreshBackupSelects() {
-    var opts = schedule.days[currentDay].blocks.map(function (b, i) { return isMinor(b) ? "" : '<option value="' + i + '">' + esc(b.start + " " + (b.cls || "") + " " + (b.subject || "")) + "</option>"; }).join("");
+    var opts = schedule.days[currentDay].blocks.map(function (b, i) { return isMinor(b) ? "" : '<option value="' + i + '">' + esc(b.start + " " + classLabel(b) + " " + (b.subject || "")) + "</option>"; }).join("");
     $all("[data-backup]").forEach(function (s) { s.innerHTML = '<option value="">Use in a block (' + DAY_SHORT[currentDay] + ")…</option>" + opts; });
   }
   function bindBackups() {
@@ -585,7 +611,7 @@
       bp.lesson = bk.lesson; bp.instructions = bk.instructions;
       if (!bp.links.some(function (l) { return l.url === bk.url; })) bp.links.push({ label: bk.site, url: bk.url });
       savePlanNow(); renderBlocks(); renderPrint(); s.value = "";
-      toast("Added to " + b.start + " " + (b.cls || ""));
+      toast("Added to " + b.start + " " + classLabel(b));
     });
   }
 
