@@ -1,0 +1,16 @@
+:root {
+  --accent: #c9a227;
+  --highlight: #c2410c;
+  --accent-soft: #f6e9c0;
+  --highlight-soft: #f8d7c8;
+}
+body::before {
+  content: "";
+  display: block;
+  height: 6px;
+  background: linear-gradient(90deg, var(--primary) 0 34%, var(--accent) 34% 67%, var(--highlight) 67% 100%);
+}
+.kicker { color: var(--highlight); }
+.badge { background: var(--accent-soft); color: #7a6410; }
+.btn-ghost { border-color: var(--accent); }
+@media print { body::before { display: none; } }
