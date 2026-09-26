@@ -14,7 +14,8 @@
  *   start, end  – "8:37" style, 12-hour clock without am/pm (school day)
  *   cls         – class / grade
  *   with        – optional second class in the gym at the same time (combined PE block).
- *                 The timetable writes these as "6A (5C)"; the site shows "6A + 5C (combined in gym)".
+ *                 The timetable writes these as "6A (5C)", and the site shows them the same way:
+ *                 "6A (5C)" as the class name, plus a "combined in gym · 2 classes" badge.
  *   orig        – the label exactly as written in the timetable, kept for reference
  *   subject     – PE, Music, Tech, Health, Social, Library, Prep, Recess, Lunch
  *   room        – location ("Gym" for PE; the timetable doesn't list other rooms)
