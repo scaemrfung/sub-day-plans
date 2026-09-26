@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sub Day Plans · Mr. Fun · SCA</title>
+  <meta name="description" content="Pick a day, fill in the plan for each block, then print it for a substitute or share a read-only link." />
+  <meta name="referrer" content="no-referrer" />
+  <meta name="site-updated" content="2026-09-26T16:45:00Z" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;650;700&family=Newsreader:opsz,wght@6..72,500;6..72,560;6..72,650&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="palette.css" />
+</head>
+<body>
+  <header class="topbar no-print">
+    <a class="brand" href="./" id="brandLink">
+      <div class="logo" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="11" rx="1.5" fill="none" stroke="#F7FBFF" stroke-width="1.6"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3" stroke="#F7FBFF" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </div>
+      <div>
+        <div class="brand-title">Sub Day Plans</div>
+        <div class="brand-sub">Mr. Fun · SCA · K–6</div>
+      </div>
+    </a>
+    <nav class="top-nav editor-only" aria-label="Sections">
+      <a href="#plan">Plan</a>
+      <a href="#schedule">Schedule</a>
+      <a href="#backup">No-prep plans</a>
+    </nav>
+  </header>
+
+  <!-- ============ READ-ONLY SHARED VIEW ============ -->
+  <div id="readonlyBar" class="readonly-bar no-print" hidden>
+    <div>
+      <strong>Read-only substitute plan.</strong>
+      <span>Shared by link — nothing here is stored on a server. Print it or keep this tab open.</span>
+    </div>
+    <div class="ro-actions">
+      <button class="btn btn-primary" type="button" id="roPrint">Print</button>
+      <a class="btn btn-ghost" href="./" id="roEditor">Open the editor</a>
+    </div>
+  </div>
+
+  <main class="main" id="main">
+    <div id="editor" class="editor-only">
+      <section class="hero-grid" id="plan">
+        <div>
+          <p class="kicker">Substitute plans · SCA</p>
+          <h1>Pick a day, fill in each block, then print or share.</h1>
+          <p class="lead">Your timetable is already loaded. Everything saves in this browser as you type. Print a 1–2 page plan, or send the sub a read-only link.</p>
+        </div>
+        <aside class="panel">
+          <div class="soft-kicker">Day</div>
+          <div class="day-picker" role="radiogroup" aria-label="Day of the week" id="dayPicker"></div>
+          <label class="field" style="margin-top:12px;">
+            <span>Specific date (optional)</span>
+            <input type="date" id="dateInput" />
+          </label>
+          <div class="hint" id="dateHint"></div>
+          <div class="save-state" id="saveState" aria-live="polite">Saved in this browser</div>
+        </aside>
+      </section>
+
+      <div class="actions sticky-actions" id="dayActions">
+        <button class="btn btn-primary" type="button" id="btnPrint">🖨 Print</button>
+        <button class="btn btn-primary btn-alt" type="button" id="btnShare">🔗 Share online</button>
+        <span class="action-group">
+          <label class="sr-only" for="copyFrom">Copy from another day</label>
+          <select id="copyFrom" class="select-btn"><option value="">Copy from another day…</option></select>
+        </span>
+        <button class="btn btn-ghost" type="button" id="btnSaveTemplate">Save as template</button>
+        <button class="btn btn-ghost" type="button" id="btnApplyTemplate">Fill from template</button>
+        <button class="btn btn-ghost btn-danger" type="button" id="btnClear">Clear day</button>
+      </div>
+
+      <h2 id="dayHeading">Monday</h2>
+
+      <section class="cards cards-2" aria-label="Day details" id="dayFields">
+        <div class="card">
+          <h3>People</h3>
+          <label class="field"><span>Teacher</span><input data-day="teacher" type="text" placeholder="Mr. Fun" /></label>
+          <label class="field"><span>Substitute</span><input data-day="sub" type="text" placeholder="Sub’s name" /></label>
+        </div>
+        <div class="card">
+          <h3>Duties</h3>
+          <label class="field"><span>Recess / lunch supervision &amp; other duties</span><textarea data-day="duties" rows="3" placeholder="e.g. Outdoor recess supervision 10:16–10:31, back field. Vest and radio are in the office."></textarea></label>
+        </div>
+        <div class="card">
+          <h3>Bell times</h3>
+          <label class="field"><span>From your timetable — edit if today is different</span><textarea data-day="bells" rows="3"></textarea></label>
+        </div>
+        <div class="card">
+          <h3>Students to know about</h3>
+          <div class="privacy-warn" role="note">⚠ General notes only. Share links and printouts can travel. Don’t put student names with medical, family or behaviour details here. Tell the sub to check the office binder instead.</div>
+          <label class="field"><span>General notes</span><textarea data-day="needs" rows="3" placeholder="e.g. Allergy and medical info is in the red binder in the office. Some students have EpiPens; the list is posted in the gym office."></textarea></label>
+        </div>
+        <div class="card">
+          <h3>Emergency procedures</h3>
+          <label class="field"><span>Fire exit, lockdown, meeting spot, class lists</span><textarea data-day="emergency" rows="3" placeholder="e.g. Gym fire exit: east doors to the back field. Class lists are on the clipboard by the gym door."></textarea></label>
+        </div>
+        <div class="card">
+          <h3>Helpful staff</h3>
+          <label class="field"><span>Who to ask for help</span><textarea data-day="contacts" rows="3" placeholder="e.g. Office: ext. 100 · Teacher next door: ___ · Admin on duty: ___"></textarea></label>
+        </div>
+      </section>
+
+      <h2>Blocks</h2>
+      <p class="section-note">Classes get a full plan. Prep, recess and lunch get one short note (use it for duties).</p>
+      <div id="blocks" class="blocks"></div>
+
+      <section class="card" style="margin-top:14px;">
+        <h3>End-of-day notes (for the sub)</h3>
+        <label class="field"><span>Leave blank to print lines the sub can write on</span><textarea data-day="endNotes" rows="3" placeholder="How did it go? Who was absent? Anything I should follow up on?"></textarea></label>
+      </section>
+
+      <!-- No-prep emergency plans -->
+      <section id="backup">
+        <h2>No-prep emergency plans</h2>
+        <p class="section-note">Backup activities from your own sites, for when the plan falls through. Add one to the current day with “Use in a block”.</p>
+        <div class="cards" id="backupCards"></div>
+      </section>
+
+      <!-- Schedule editor -->
+      <section id="schedule">
+        <h2>Weekly schedule</h2>
+        <p class="section-note" id="scheduleSource"></p>
+        <div class="panel">
+          <div class="schedule-toolbar">
+            <div class="day-picker small" role="tablist" aria-label="Schedule day" id="schedDayPicker"></div>
+            <div class="toolbar-btns">
+              <button class="btn btn-ghost" type="button" id="btnAddBlock">+ Add block</button>
+              <button class="btn btn-ghost" type="button" id="btnExport">Export JSON</button>
+              <button class="btn btn-ghost" type="button" id="btnImport">Import JSON</button>
+              <input type="file" id="importFile" accept="application/json,.json" hidden />
+              <button class="btn btn-ghost btn-danger" type="button" id="btnResetSchedule">Reset to default</button>
+            </div>
+          </div>
+          <div class="sched-wrap">
+            <table class="sched-table" id="schedTable">
+              <thead><tr><th>Start</th><th>End</th><th>Class / grade</th><th>Subject</th><th>Room</th><th>Type</th><th>Suggested site</th><th><span class="sr-only">Actions</span></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <label class="field" style="margin-top:12px;"><span>Day bell times (default for new plans)</span><input type="text" id="schedBells" /></label>
+          <p class="hint">Changes save in this browser. Plans are matched to blocks by their start–end time, so changing a time moves that block’s plan out of view (it isn’t deleted — change the time back to see it).</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- ============ PRINT / READ-ONLY PLAN ============ -->
+    <article id="printView" class="print-view" aria-label="Printable substitute plan"></article>
+  </main>
+
+  <footer class="site-foot no-print editor-only">
+    No sign-in, no tracking. Plans live in this browser (localStorage) and in share links you create. Don’t put private student information here.
+  </footer>
+
+  <dialog id="shareDialog">
+    <form method="dialog" class="dialog-body">
+      <h3>Share a read-only link</h3>
+      <p class="hint">The whole plan is packed into the link itself (compressed). Anyone with the link can read it; no server stores it.</p>
+      <textarea id="shareUrl" rows="4" readonly></textarea>
+      <div id="shareWarn" class="privacy-warn" hidden></div>
+      <div class="actions" style="margin:12px 0 0;">
+        <button class="btn btn-primary" type="button" id="btnCopyLink">Copy link</button>
+        <a class="btn btn-ghost" id="btnOpenLink" target="_blank" rel="noopener">Open it</a>
+        <button class="btn btn-ghost" value="close">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="importDialog">
+    <form method="dialog" class="dialog-body">
+      <h3>Import schedule JSON</h3>
+      <p class="hint">Paste JSON exported from this site (or choose a file). It replaces the schedule in this browser.</p>
+      <textarea id="importText" rows="8" placeholder='{"days":{"mon":{"blocks":[...]}}}'></textarea>
+      <div class="actions" style="margin:12px 0 0;">
+        <button class="btn btn-primary" type="button" id="btnImportApply">Import</button>
+        <button class="btn btn-ghost" type="button" id="btnImportFile">Choose file…</button>
+        <button class="btn btn-ghost" value="close">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast no-print" role="status" aria-live="polite"></div>
+
+  <script src="schedule.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
