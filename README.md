@@ -17,8 +17,8 @@ Plain HTML/CSS/JS. No frameworks, no sign-in, no tracking, no server.
 ## Where the default schedule comes from
 `schedule.js` is built from **Patrick_Fung_Timetable_2026-2027.docx** (Google Drive → My Drive/SCAE/2026-2027/Timetable).
 - Monday, Tuesday, Thursday and Friday follow the regular bell times. Wednesday has its own modified times, as the timetable shows.
-- Class names are copied as written, e.g. `6A (5C)`. The timetable doesn't say what the bracket means, so it's left as is.
-- The timetable doesn't list rooms, so `room` is blank except Wednesday's 6A Library.
+- A bracket in the timetable, e.g. `6A (5C)`, means a second class is in the gym at the same time (a combined PE block). `schedule.js` stores it as `cls: "6A", with: "5C"` and keeps the original label in `orig`. The site and printouts show **6A + 5C** with a "TWO CLASSES · combined in gym" tag.
+- PE blocks have `room: "Gym"`. Wednesday's 6A Library is "Library". The timetable doesn't list other rooms.
 - Recess and lunch are shown as break blocks. Supervision duties aren't in the timetable, so add them in the day's **Duties** box or in that block's note.
 
 To bake in changes made on the site: **Weekly schedule → Export JSON**, then paste the JSON after `window.DEFAULT_SCHEDULE =` in `schedule.js`.
