@@ -122,8 +122,10 @@
     if (isNaN(d)) return null;
     return ["sun", "mon", "tue", "wed", "thu", "fri", "sat"][d.getDay()];
   }
-  /* Combined PE blocks: a second class in the gym at the same time ("6A (5C)" in the timetable). */
-  function classLabel(b) { return b.with ? b.cls + " + " + b.with : (b.cls || ""); }
+  /* Combined PE blocks: a second class in the gym at the same time. Shown exactly like the timetable: "6A (5C)". */
+  function classLabel(b) { return b.with ? b.cls + " (" + b.with + ")" : (b.cls || ""); }
+  // Only show the "Timetable: …" line when it says something the class label doesn't.
+  function origNote(b) { return b.orig && b.orig.replace(/\s+/g, " ").trim() !== classLabel(b) ? b.orig : ""; }
   function combinedNote(b) { return b.with ? "Combined in " + (b.room || "gym").toLowerCase() + " · 2 classes" : ""; }
   function linkLines(links) { return (links || []).filter(function (l) { return l && l.url; }); }
 
@@ -155,6 +157,43 @@
         if (name.indexOf("day:") !== 0 && name !== "template") continue;
         var o = lsGet(name, null);
         if (fixTeacher(o)) lsSet(name, o);
+      }
+    } catch (e) {}
+  })();
+  /* Combined classes used to be written "6A + 5C". Put them back in timetable form "6A (5C)"
+     in the saved schedule, saved plans and the template (safe to run on every load). */
+  var PLUS_LABEL = /\b([K1-6][A-Z])\s*\+\s*([K1-6][A-Z])\b/g;
+  function fixLabelText(v) { return typeof v === "string" ? v.replace(PLUS_LABEL, "$1 ($2)") : v; }
+  function fixPlanLabels(o) {
+    if (!o || typeof o !== "object") return false;
+    var before = JSON.stringify(o);
+    DAY_FIELDS.forEach(function (f) { if (typeof o[f] === "string") o[f] = fixLabelText(o[f]); });
+    Object.keys(o.blocks || {}).forEach(function (k) {
+      var bp = o.blocks[k]; if (!bp) return;
+      BLOCK_FIELDS.forEach(function (f) { if (typeof bp[f] === "string") bp[f] = fixLabelText(bp[f]); });
+      (bp.links || []).forEach(function (l) { if (l && typeof l.label === "string") l.label = fixLabelText(l.label); });
+    });
+    return JSON.stringify(o) !== before;
+  }
+  function fixScheduleBlock(b) {
+    var m = !b.with && typeof b.cls === "string" && b.cls.trim().match(/^([K1-6][A-Z])\s*\+\s*([K1-6][A-Z])$/);
+    if (m) { b.cls = m[1]; b.with = m[2]; b.orig = fixLabelText(b.orig || "") || m[1] + " (" + m[2] + ")"; return true; }
+    if (typeof b.orig === "string" && PLUS_LABEL.test(b.orig)) { PLUS_LABEL.lastIndex = 0; b.orig = fixLabelText(b.orig); return true; }
+    PLUS_LABEL.lastIndex = 0;
+    return false;
+  }
+  (function migrateLabels() {
+    try {
+      var changed = false;
+      DAY_KEYS.forEach(function (k) { (schedule.days[k].blocks || []).forEach(function (b) { if (fixScheduleBlock(b)) changed = true; }); });
+      if (changed && lsGet("schedule", null)) lsSet("schedule", schedule);
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (!key || key.indexOf(LS) !== 0) continue;
+        var name = key.slice(LS.length);
+        if (name.indexOf("day:") !== 0 && name !== "template") continue;
+        var o = lsGet(name, null);
+        if (fixPlanLabels(o)) lsSet(name, o);
       }
     } catch (e) {}
   })();
@@ -236,7 +275,7 @@
         (b.duty ? '<div class="block-subject"><span class="badge duty-badge">DUTY</span></div>' : "") +
         (b.cls && subj ? '<div class="block-subject"><span class="badge subj-' + subj.replace(/\W/g, "") + '">' + subj + "</span></div>" : "") +
         (b.room ? '<div class="block-room">📍 ' + esc(b.room) + "</div>" : "") +
-        (b.orig ? '<div class="block-orig">Timetable: ' + esc(b.orig) + "</div>" : "") + "</div>";
+        (origNote(b) ? '<div class="block-orig">Timetable: ' + esc(origNote(b)) + "</div>" : "") + "</div>";
       if (b.duty) {
         return '<div class="block minor duty" data-idx="' + i + '">' + side + '<div class="block-body">' +
           '<div class="duty-flag">⚠ DUTY: ' + esc(b.duty) + (b.room ? " · " + esc(b.room) : "") + "</div>" +
@@ -413,7 +452,7 @@
       var cls = '<strong>' + esc(classLabel(b) || b.subject) + "</strong>" +
         (b.with ? '<span class="pv-two">TWO CLASSES · combined in ' + esc((b.room || "gym").toLowerCase()) + "</span>" : "") +
         (b.cls ? esc(b.subject) : "") + (b.room ? " · " + esc(b.room) : "") +
-        (b.orig ? '<span class="pv-orig">Timetable: ' + esc(b.orig) + "</span>" : "");
+        (origNote(b) ? '<span class="pv-orig">Timetable: ' + esc(origNote(b)) + "</span>" : "");
       return '<tr' + (b.with ? ' class="pv-combined"' : "") + '><td class="pv-time">' + time + '</td><td class="pv-cls">' + cls + '</td><td class="pv-plan">' + parts.join("") + "</td></tr>";
     }).join("");
     var end = p.endNotes
@@ -456,7 +495,7 @@
         kind: "class", time: time, cls: classLabel(b) || b.subject || "",
         tags: b.with ? ["Two classes · combined in " + (b.room || "gym").toLowerCase()] : [],
         sub: [(b.cls ? b.subject || "" : "") + (b.room ? (b.cls && b.subject ? " · " : "") + b.room : "")].filter(Boolean),
-        orig: b.orig || "", combined: !!b.with, plan: plan
+        orig: origNote(b), combined: !!b.with, plan: plan
       };
     });
     var who = p.teacher || TEACHER;
@@ -552,7 +591,7 @@
       if (!data || !data.s || !data.p) throw new Error("bad data");
       var blocks = data.s.map(function (a) { return { start: a[0], end: a[1], cls: a[2], subject: a[3], room: a[4], type: a[5], with: a[6] || "", orig: a[7] || "", duty: a[8] || "" }; });
       data.p.blocks = data.p.blocks || {};
-      fixTeacher(data.p);
+      fixTeacher(data.p); fixPlanLabels(data.p);
       $("#printView").innerHTML = planHTML(data.d, blocks, data.p);
       $("#roPdf").onclick = function () { exportFile("pdf", data.d, blocks, data.p); };
       $("#roDocx").onclick = function () { exportFile("docx", data.d, blocks, data.p); };
@@ -576,7 +615,7 @@
         '<td class="t"><input type="text" data-sf="start" value="' + esc(b.start) + '" aria-label="Start time" /></td>' +
         '<td class="t"><input type="text" data-sf="end" value="' + esc(b.end) + '" aria-label="End time" /></td>' +
         '<td><input type="text" data-sf="cls" value="' + esc(b.cls) + '" aria-label="Class or grade" /></td>' +
-        '<td><input type="text" data-sf="with" value="' + esc(b.with) + '" placeholder="—" aria-label="Second class in the gym (combined)" title="' + esc(b.orig ? "Timetable: " + b.orig : "") + '" /></td>' +
+        '<td><input type="text" data-sf="with" value="' + esc(b.with) + '" placeholder="—" aria-label="Second class in the gym (shown in brackets)" title="' + esc(b.orig ? "Timetable: " + b.orig : "") + '" /></td>' +
         '<td><input type="text" data-sf="subject" value="' + esc(b.subject) + '" aria-label="Subject" /></td>' +
         '<td><input type="text" data-sf="room" value="' + esc(b.room) + '" aria-label="Room" /></td>' +
         '<td><input type="text" data-sf="duty" value="' + esc(b.duty) + '" placeholder="—" aria-label="Supervision duty" /></td>' +
@@ -654,6 +693,7 @@
           if (!Array.isArray(d.blocks)) throw new Error(k + ".blocks must be a list");
           d.label = d.label || DAY_LONG[k];
           d.blocks = d.blocks.map(function (b) { return { start: String(b.start || ""), end: String(b.end || ""), cls: String(b.cls || ""), with: String(b.with || ""), orig: String(b.orig || ""), subject: String(b.subject || ""), room: String(b.room || ""), duty: String(b.duty || ""), type: ["class", "prep", "break"].indexOf(b.type) >= 0 ? b.type : "class", link: SITES[b.link] ? b.link : "" }; });
+          d.blocks.forEach(fixScheduleBlock);
           obj.days[k] = d;
         });
         schedule = obj; scheduleChanged(); $("#importDialog").close(); toast("Schedule imported");
