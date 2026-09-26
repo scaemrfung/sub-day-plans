@@ -19,7 +19,8 @@ Plain HTML/CSS/JS. No frameworks, no sign-in, no tracking, no server.
 - Monday, Tuesday, Thursday and Friday follow the regular bell times. Wednesday has its own modified times, as the timetable shows.
 - A bracket in the timetable, e.g. `6A (5C)`, means a second class is in the gym at the same time (a combined PE block). `schedule.js` stores it as `cls: "6A", with: "5C"` and keeps the original label in `orig`. The site and printouts show **6A + 5C** with a "TWO CLASSES · combined in gym" tag.
 - PE blocks have `room: "Gym"`. Wednesday's 6A Library is "Library". The timetable doesn't list other rooms.
-- Recess and lunch are shown as break blocks. Supervision duties aren't in the timetable, so add them in the day's **Duties** box or in that block's note.
+- Recess and lunch are shown as break blocks.
+- **Library supervision duty** is during the middle recess Tuesday to Friday (none on Monday): 11:55–12:15, or 11:52–12:17 on Wednesday. It's set on that recess block (`duty`, room "Library") and in each day's `duties`, which fills in the Duties box on a new plan. Printouts show it in a boxed "Duties" note at the top and a bold DUTY row.
 
 To bake in changes made on the site: **Weekly schedule → Export JSON**, then paste the JSON after `window.DEFAULT_SCHEDULE =` in `schedule.js`.
 

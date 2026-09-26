@@ -8,6 +8,8 @@
  * (Weekly schedule section) are saved in that browser only; use "Export JSON" there and
  * paste the result here to bake it in for everyone.
  *
+ * Day fields: label, bells, duties (pre-fills the Duties box on a new plan), blocks.
+ *
  * Block fields:
  *   start, end  – "8:37" style, 12-hour clock without am/pm (school day)
  *   cls         – class / grade
@@ -17,6 +19,7 @@
  *   subject     – PE, Music, Tech, Health, Social, Library, Prep, Recess, Lunch
  *   room        – location ("Gym" for PE; the timetable doesn't list other rooms)
  *   type        – "class" (gets a full plan form), "prep", or "break"
+ *   duty        – optional supervision duty during a break block (shown as DUTY on the plan)
  *   link        – optional suggested lesson site (key from SITES in app.js)
  */
 window.DEFAULT_SCHEDULE = {
@@ -24,6 +27,7 @@ window.DEFAULT_SCHEDULE = {
   days: {
     mon: {
       label: "Monday",
+      duties: "",
       bells: "8:37 start · Recess 10:16–10:31 · Lunch 11:37–11:55 · Recess 11:55–12:15 · Recess 1:59–2:14 · Dismissal 3:19",
       blocks: [
         { start: "8:37",  end: "9:10",  cls: "6A", with: "5C", orig: "6A (5C)", subject: "PE",     room: "Gym", type: "class", link: "pe" },
@@ -44,6 +48,7 @@ window.DEFAULT_SCHEDULE = {
     },
     tue: {
       label: "Tuesday",
+      duties: "Library supervision duty during the middle recess, 11:55–12:15, in the Library.",
       bells: "8:37 start · Recess 10:16–10:31 · Lunch 11:37–11:55 · Recess 11:55–12:15 · Recess 1:59–2:14 · Dismissal 3:19",
       blocks: [
         { start: "8:37",  end: "9:10",  cls: "",        subject: "Prep",   room: "", type: "prep" },
@@ -53,7 +58,7 @@ window.DEFAULT_SCHEDULE = {
         { start: "10:31", end: "11:04", cls: "KD", with: "1C", orig: "KD (1C)", subject: "PE",     room: "Gym", type: "class", link: "pe" },
         { start: "11:04", end: "11:37", cls: "1A", with: "1B", orig: "1A (1B)", subject: "PE",     room: "Gym", type: "class", link: "pe" },
         { start: "11:37", end: "11:55", cls: "",        subject: "Lunch",  room: "", type: "break" },
-        { start: "11:55", end: "12:15", cls: "",        subject: "Recess", room: "", type: "break" },
+        { start: "11:55", end: "12:15", cls: "",        subject: "Recess", room: "Library", type: "break", duty: "Library supervision duty" },
         { start: "12:20", end: "12:53", cls: "5B", with: "4B", orig: "5B (4B)", subject: "PE",     room: "Gym", type: "class", link: "pe" },
         { start: "12:53", end: "1:26",  cls: "1D",      subject: "Music",  room: "", type: "class", link: "music" },
         { start: "1:26",  end: "1:59",  cls: "3C", with: "4A", orig: "3C (4A)", subject: "PE",     room: "Gym", type: "class", link: "pe" },
@@ -64,6 +69,7 @@ window.DEFAULT_SCHEDULE = {
     },
     wed: {
       label: "Wednesday",
+      duties: "Library supervision duty during the middle recess, 11:52–12:17, in the Library.",
       bells: "Modified Wednesday times · 8:37 start · Recess 9:58–10:13 · Lunch 11:31–11:52 · Recess 11:52–12:17 · Recess 1:11–1:26 · Last block ends 2:19",
       blocks: [
         { start: "8:37",  end: "9:04",  cls: "6A", with: "5C", orig: "6A (5C)", subject: "PE",      room: "Gym", type: "class", link: "pe" },
@@ -74,7 +80,7 @@ window.DEFAULT_SCHEDULE = {
         { start: "10:40", end: "11:07", cls: "KC/KD",    subject: "Social",  room: "", type: "class" },
         { start: "11:07", end: "11:31", cls: "5B",       subject: "PE",      room: "Gym", type: "class", link: "pe" },
         { start: "11:31", end: "11:52", cls: "",         subject: "Lunch",   room: "", type: "break" },
-        { start: "11:52", end: "12:17", cls: "",         subject: "Recess",  room: "", type: "break" },
+        { start: "11:52", end: "12:17", cls: "",         subject: "Recess",  room: "Library", type: "break", duty: "Library supervision duty" },
         { start: "12:17", end: "12:44", cls: "1D",       subject: "Music",   room: "", type: "class", link: "music" },
         { start: "12:44", end: "1:11",  cls: "3C", with: "4A", orig: "3C (4A)", subject: "PE",      room: "Gym", type: "class", link: "pe" },
         { start: "1:11",  end: "1:26",  cls: "",         subject: "Recess",  room: "", type: "break" },
@@ -84,6 +90,7 @@ window.DEFAULT_SCHEDULE = {
     },
     thu: {
       label: "Thursday",
+      duties: "Library supervision duty during the middle recess, 11:55–12:15, in the Library.",
       bells: "8:37 start · Recess 10:16–10:31 · Lunch 11:37–11:55 · Recess 11:55–12:15 · Recess 1:59–2:14 · Dismissal 3:19",
       blocks: [
         { start: "8:37",  end: "9:10",  cls: "6A",      subject: "PE",     room: "Gym", type: "class", link: "pe" },
@@ -93,7 +100,7 @@ window.DEFAULT_SCHEDULE = {
         { start: "10:31", end: "11:04", cls: "KA", with: "1C", orig: "KA (1C)", subject: "PE",     room: "Gym", type: "class", link: "pe" },
         { start: "11:04", end: "11:37", cls: "1A",      subject: "PE",     room: "Gym", type: "class", link: "pe" },
         { start: "11:37", end: "11:55", cls: "",        subject: "Lunch",  room: "", type: "break" },
-        { start: "11:55", end: "12:15", cls: "",        subject: "Recess", room: "", type: "break" },
+        { start: "11:55", end: "12:15", cls: "",        subject: "Recess", room: "Library", type: "break", duty: "Library supervision duty" },
         { start: "12:20", end: "12:53", cls: "1B",      subject: "Music",  room: "", type: "class", link: "music" },
         { start: "12:53", end: "1:26",  cls: "1C",      subject: "Music",  room: "", type: "class", link: "music" },
         { start: "1:26",  end: "1:59",  cls: "1A",      subject: "Music",  room: "", type: "class", link: "music" },
@@ -104,6 +111,7 @@ window.DEFAULT_SCHEDULE = {
     },
     fri: {
       label: "Friday",
+      duties: "Library supervision duty during the middle recess, 11:55–12:15, in the Library.",
       bells: "8:37 start · Recess 10:16–10:31 · Lunch 11:37–11:55 · Recess 11:55–12:15 · Recess 1:59–2:14 · Dismissal 3:19",
       blocks: [
         { start: "8:37",  end: "9:10",  cls: "6A", with: "5C", orig: "6A (5C)", subject: "PE",     room: "Gym", type: "class", link: "pe" },
@@ -113,7 +121,7 @@ window.DEFAULT_SCHEDULE = {
         { start: "10:31", end: "11:04", cls: "KB",      subject: "PE",     room: "Gym", type: "class", link: "pe" },
         { start: "11:04", end: "11:37", cls: "1A", with: "1B", orig: "1A (1B)", subject: "PE",     room: "Gym", type: "class", link: "pe" },
         { start: "11:37", end: "11:55", cls: "",        subject: "Lunch",  room: "", type: "break" },
-        { start: "11:55", end: "12:15", cls: "",        subject: "Recess", room: "", type: "break" },
+        { start: "11:55", end: "12:15", cls: "",        subject: "Recess", room: "Library", type: "break", duty: "Library supervision duty" },
         { start: "12:20", end: "12:53", cls: "5B", with: "4B", orig: "5B (4B)", subject: "PE",     room: "Gym", type: "class", link: "pe" },
         { start: "12:53", end: "1:26",  cls: "1D",      subject: "Music",  room: "", type: "class", link: "music" },
         { start: "1:26",  end: "1:59",  cls: "3C", with: "4A", orig: "3C (4A)", subject: "PE",     room: "Gym", type: "class", link: "pe" },
