@@ -15,6 +15,24 @@
   }
   function latin1Bytes(s) { var b = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 255; return b; }
 
+  /* Links: text is a list of segments {t, url}. URLs typed into plan fields (http(s):// or www.)
+     are found automatically; links with a friendly name arrive as ready-made segments. */
+  var URL_RE = /(https?:\/\/|www\.)[^\s<>"]*[^\s<>".,;:!?'")\]]/gi;
+  function href(u) { u = String(u || "").trim(); if (/^www\./i.test(u)) u = "https://" + u; return /^https?:\/\/\S+$/i.test(u) ? u : ""; }
+  function autoLink(text) {
+    text = String(text == null ? "" : text);
+    var out = [], last = 0, m;
+    URL_RE.lastIndex = 0;
+    while ((m = URL_RE.exec(text))) {
+      if (m.index > last) out.push({ t: text.slice(last, m.index) });
+      out.push({ t: m[0], url: href(m[0]) });
+      last = m.index + m[0].length;
+    }
+    if (last < text.length) out.push({ t: text.slice(last) });
+    return out;
+  }
+  function segsOf(it) { return it.segs ? it.segs.map(function (g) { return { t: g.t, url: g.url ? href(g.url) : "" }; }) : autoLink(it.v); }
+
   /* ================= PDF ================= */
   var W_R = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584,350,556,350,222,556,333,1000,556,556,333,1000,667,333,1000,350,611,350,350,222,222,333,333,350,556,1000,333,1000,500,333,944,350,500,667,278,333,556,556,556,556,260,556,333,737,370,556,584,333,737,333,400,584,333,333,333,556,537,278,333,333,365,556,834,834,834,611,667,667,667,667,667,667,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,500,556,556,556,556,278,278,278,278,556,556,556,556,556,556,556,584,611,556,556,556,556,500,556,500];
   var W_B = [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584,350,556,350,278,556,500,1000,556,556,333,1000,667,333,1000,350,611,350,350,278,278,500,500,350,556,1000,333,1000,556,333,944,350,500,667,278,333,556,556,556,556,280,556,333,737,370,556,584,333,737,333,400,584,333,333,333,611,556,278,333,333,365,556,834,834,834,611,722,722,722,722,722,722,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,556,556,556,556,556,278,278,278,278,611,611,611,611,611,611,611,584,611,611,611,611,611,556,611,556];
@@ -66,15 +84,56 @@
     }
     return lines;
   }
+  // Wrap segments; returns lines, each a list of pieces {t, url} (WinAnsi text).
+  function wrapRich(segs, bold, size, maxW, firstW) {
+    var lines = [[]], curW = 0, pend = false, spW = textW(" ", bold, size);
+    function lim() { return lines.length === 1 && firstW != null ? firstW : maxW; }
+    function newLine() { lines.push([]); curW = 0; pend = false; }
+    function add(t, url) { var ln = lines[lines.length - 1], lp = ln[ln.length - 1]; if (lp && (lp.url || "") === (url || "")) lp.t += t; else ln.push({ t: t, url: url || "" }); curW += textW(t, bold, size); }
+    segs.forEach(function (g) {
+      win(g.t).split(/(\n| +)/).forEach(function (tok) {
+        if (!tok) return;
+        if (tok === "\n") { newLine(); return; }
+        if (/^ +$/.test(tok)) { pend = lines[lines.length - 1].length > 0; return; }
+        var w = tok, ww = textW(w, bold, size);
+        if (pend && curW + spW + ww <= lim()) { var ln = lines[lines.length - 1], lp = ln[ln.length - 1]; add(" ", lp && lp.url && lp.url === g.url ? g.url : ""); }
+        else if (pend || curW + ww > lim()) { if (lines[lines.length - 1].length) newLine(); }
+        pend = false;
+        while (textW(w, bold, size) > lim() - curW && w.length > 1) {
+          var k = 1;
+          while (k < w.length && curW + textW(w.slice(0, k + 1), bold, size) <= lim()) k++;
+          add(w.slice(0, k), g.url); newLine(); w = w.slice(k);
+        }
+        add(w, g.url);
+      });
+    });
+    return lines;
+  }
+  function uriStr(u) { return "(" + encodeURI(decodeURIComponentSafe(u)).replace(/\\/g, "%5C").replace(/\(/g, "%28").replace(/\)/g, "%29") + ")"; }
+  function decodeURIComponentSafe(u) { try { return decodeURI(u); } catch (e) { return u; } }
   function pdfStr(s) { return "(" + s.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)") + ")"; }
   function rgb(hex) { var n = parseInt(hex.slice(1), 16); return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255].map(function (v) { return +v.toFixed(3); }).join(" "); }
 
   var PW = 612, PH = 792, M = 40, CW = PW - 2 * M;
+  var LINK = "#0b57d0";
   var RED = "#b91c1c", DARK = "#111827", GREY = "#4b5563", LIGHT = "#6b7280", DUTYBG = "#fdecec", HEADBG = "#e5e7eb", TAGBG = "#fff4e5";
 
   function buildPDF(m) {
-    var pages = [], ops = null, y = 0;
-    function newPage() { ops = []; pages.push(ops); y = M; }
+    var pages = [], annots = [], ann = null, ops = null, y = 0;
+    function newPage() { ops = []; pages.push(ops); ann = []; annots.push(ann); y = M; }
+    // Draw a wrapped line of pieces; links are blue, underlined and get a /Link annotation.
+    function TR(x, yy, pieces, bold, size, color) {
+      var cx = x;
+      pieces.forEach(function (pc) {
+        var w = textW(pc.t, bold, size);
+        if (pc.url && pc.t.trim()) {
+          T(cx, yy, pc.t, bold, size, LINK);
+          L(cx, yy + 1.4, cx + w, yy + 1.4, LINK, 0.5);
+          ann.push({ r: [cx, PH - yy - 2.5, cx + w, PH - yy + size * 0.8], uri: pc.url });
+        } else T(cx, yy, pc.t, bold, size, color);
+        cx += w;
+      });
+    }
     function T(x, yy, s, bold, size, color) {
       if (!s) return;
       ops.push("BT /" + (bold ? "F2" : "F1") + " " + size + " Tf " + rgb(color || DARK) + " rg " + x.toFixed(2) + " " + (PH - yy).toFixed(2) + " Td " + pdfStr(s) + " Tj ET");
@@ -100,11 +159,11 @@
 
     /* duties — boxed in red so the sub can't miss it */
     if (m.duties) {
-      var dl = wrap(win(m.duties), true, 10.5, CW - 20);
+      var dl = wrapRich(autoLink(m.duties), true, 10.5, CW - 20);
       var dh = 22 + dl.length * 13 + 6;
       R(M, y, CW, dh, DUTYBG, RED, 2);
       T(M + 10, y + 15, win("\u26a0 DUTIES \u2014 PLEASE DON\u2019T MISS"), true, 10, RED);
-      dl.forEach(function (ln, i) { T(M + 10, y + 30 + i * 13, ln, true, 10.5, DARK); });
+      dl.forEach(function (ln, i) { TR(M + 10, y + 30 + i * 13, ln, true, 10.5, DARK); });
       y += dh + 10;
     }
 
@@ -112,13 +171,13 @@
     var info = m.info.filter(function (f) { return f.value; });
     var colW = (CW - 14) / 2;
     for (var i = 0; i < info.length; i += 2) {
-      var pair = [info[i], info[i + 1]].filter(Boolean).map(function (f) { return { label: win(f.label).toUpperCase(), lines: wrap(win(f.value), false, 9.5, colW) }; });
+      var pair = [info[i], info[i + 1]].filter(Boolean).map(function (f) { return { label: win(f.label).toUpperCase(), lines: wrapRich(autoLink(f.value), false, 9.5, colW) }; });
       var h = 12 + Math.max.apply(null, pair.map(function (p) { return p.lines.length; })) * 11.5 + 6;
       room(h);
       pair.forEach(function (p, j) {
         var x = M + j * (colW + 14);
         T(x, y + 8, p.label, true, 7.5, GREY);
-        p.lines.forEach(function (ln, k) { T(x, y + 20 + k * 11.5, ln, false, 9.5, DARK); });
+        p.lines.forEach(function (ln, k) { TR(x, y + 20 + k * 11.5, ln, false, 9.5, DARK); });
       });
       y += h;
     }
@@ -145,8 +204,8 @@
       (r.plan || []).forEach(function (it) {
         var size = dim ? 8.5 : 9, bold = !!it.strong, col = it.color === "red" ? RED : dim ? GREY : DARK;
         var key = it.k ? win(it.k) + " " : "", kw = key ? textW(key, true, size) : 0;
-        var ls = wrap(win(it.v), bold, size, w2, key ? w2 - kw : null);
-        ls.forEach(function (t, j) { cPlan.push({ t: t, b: bold, s: size, c: col, h: size + 2.5, pre: j === 0 ? key : "", preW: kw }); });
+        var ls = wrapRich(segsOf(it), bold, size, w2, key ? w2 - kw : null);
+        ls.forEach(function (pcs, j) { cPlan.push({ runs: pcs, b: bold, s: size, c: col, h: size + 2.5, pre: j === 0 ? key : "", preW: kw }); });
         if (it.gap) cPlan.push({ t: "", h: 3 });
       });
       var cells = [cTime, cCls, cPlan];
@@ -166,7 +225,8 @@
             var l = c[n];
             if (l.tag) { var tw = textW(l.t, true, l.s); R(x + PAD - 2, yy + 0.5, tw + 4, l.h - 0.5, TAGBG, RED, 0.8); }
             if (l.pre) T(x + PAD, yy + l.s, l.pre, true, l.s, l.c);
-            T(x + PAD + (l.pre ? l.preW : 0), yy + l.s, l.t, l.b, l.s, l.c);
+            if (l.runs) TR(x + PAD + (l.pre ? l.preW : 0), yy + l.s, l.runs, l.b, l.s, l.c);
+            else T(x + PAD + (l.pre ? l.preW : 0), yy + l.s, l.t, l.b, l.s, l.c);
             yy += l.h;
           }
           cells[ci] = c.slice(take[ci].n);
@@ -182,18 +242,18 @@
 
     /* end-of-day notes */
     y += 12;
-    var endLines = m.endNotes ? wrap(win(m.endNotes), false, 9.5, CW) : null;
+    var endLines = m.endNotes ? wrapRich(autoLink(m.endNotes), false, 9.5, CW) : null;
     room(endLines ? 20 + endLines.length * 12 : 80);
     T(M, y + 8, win(m.endNotes ? "END-OF-DAY NOTES" : "END-OF-DAY NOTES FROM THE SUB (HOW IT WENT, ABSENCES, FOLLOW-UPS)"), true, 7.5, GREY);
     y += 14;
-    if (endLines) { endLines.forEach(function (ln) { room(12); T(M, y + 9, ln, false, 9.5, DARK); y += 12; }); }
+    if (endLines) { endLines.forEach(function (ln) { room(12); TR(M, y + 9, ln, false, 9.5, DARK); y += 12; }); }
     else { for (var k = 0; k < 3; k++) { y += 20; L(M, y, PW - M, y, "#9ca3af", 0.6); } }
     y += 12;
     if (m.backup) {
-      var bl = wrap(win(m.backup), false, 8.5, CW);
+      var bl = wrapRich(m.backup.map ? segsOf({ segs: m.backup }) : autoLink(m.backup), false, 8.5, CW);
       room(14 + bl.length * 11);
       T(M, y + 8, "IF A PLAN FALLS THROUGH", true, 7.5, GREY); y += 12;
-      bl.forEach(function (ln) { T(M, y + 9, ln, false, 8.5, DARK); y += 11; });
+      bl.forEach(function (ln) { TR(M, y + 9, ln, false, 8.5, DARK); y += 11; });
     }
     if (m.thanks) { room(20); y += 8; T(M, y + 9, win(m.thanks), true, 9.5, DARK); }
 
@@ -204,19 +264,24 @@
       var f = win(m.footer + " \u00b7 page " + (i + 1) + " of " + total);
       T(PW - M - textW(f, false, 7.5), PH - 22, f, false, 7.5, LIGHT);
     });
-    var objs = [];
+    var objs = [], next = 5;
     objs[1] = "<< /Type /Catalog /Pages 2 0 R >>";
     objs[3] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>";
     objs[4] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>";
     var kids = [];
     pages.forEach(function (p, i) {
-      var po = 5 + i * 2, co = po + 1, stream = p.join("\n");
+      var po = next++, co = next++, stream = p.join("\n");
+      var refs = annots[i].map(function (a) {
+        var n = next++;
+        objs[n] = "<< /Type /Annot /Subtype /Link /Rect [" + a.r.map(function (v) { return v.toFixed(2); }).join(" ") + "] /Border [0 0 0] /A << /Type /Action /S /URI /URI " + uriStr(a.uri) + " >> >>";
+        return n + " 0 R";
+      });
       kids.push(po + " 0 R");
-      objs[po] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + PW + " " + PH + "] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents " + co + " 0 R >>";
+      objs[po] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + PW + " " + PH + "] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents " + co + " 0 R" + (refs.length ? " /Annots [" + refs.join(" ") + "]" : "") + " >>";
       objs[co] = "<< /Length " + stream.length + " >>\nstream\n" + stream + "\nendstream";
     });
     objs[2] = "<< /Type /Pages /Kids [" + kids.join(" ") + "] /Count " + pages.length + " >>";
-    var info = 5 + pages.length * 2;
+    var info = next++;
     objs[info] = "<< /Title " + pdfStr(win(m.docTitle)) + " /Author " + pdfStr(win(m.teacher || "")) + " /Producer (Sub Day Plans) >>";
     var out = "%PDF-1.4\n%\u00e2\u00e3\u00cf\u00d3\n", offs = [];
     for (var n = 1; n < objs.length; n++) { offs[n] = out.length; out += n + " 0 obj\n" + objs[n] + "\nendobj\n"; }
@@ -250,9 +315,28 @@
     return out;
   }
   function x(s) { return String(s == null ? "" : s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
-  // run: {t, b, color, sz (half-points), caps, hl}
+  // Hyperlink relationships for the document being built (reset by buildDOCX).
+  var rels = null;
+  function relId(url) {
+    for (var i = 0; i < rels.length; i++) if (rels[i].url === url) return rels[i].id;
+    var id = "rIdL" + (rels.length + 1); rels.push({ id: id, url: url }); return id;
+  }
+  function linkRuns(segs, base) {
+    base = base || {};
+    return segs.filter(function (g) { return g.t; }).map(function (g) {
+      var r = {}; for (var k in base) r[k] = base[k];
+      r.t = g.t; if (g.url) { r.url = g.url; delete r.color; }
+      return r;
+    });
+  }
+  // run: {t, b, color, sz (half-points), caps, hl, url}
   function run(r) {
-    var pr = (r.b ? "<w:b/>" : "") + (r.caps ? "<w:caps/>" : "") + (r.color ? '<w:color w:val="' + r.color + '"/>' : "") + (r.sz ? '<w:sz w:val="' + r.sz + '"/><w:szCs w:val="' + r.sz + '"/>' : "") + (r.hl ? '<w:shd w:val="clear" w:color="auto" w:fill="' + r.hl + '"/>' : "");
+    if (r.url && rels) {
+      var inner = {}; for (var k in r) if (k !== "url") inner[k] = r[k];
+      inner.link = true;
+      return '<w:hyperlink r:id="' + relId(r.url) + '" w:history="1">' + run(inner) + "</w:hyperlink>";
+    }
+    var pr = (r.link ? '<w:rStyle w:val="Hyperlink"/>' : "") + (r.b ? "<w:b/>" : "") + (r.caps ? "<w:caps/>" : "") + (r.color ? '<w:color w:val="' + r.color + '"/>' : "") + (r.sz ? '<w:sz w:val="' + r.sz + '"/><w:szCs w:val="' + r.sz + '"/>' : "") + (r.hl ? '<w:shd w:val="clear" w:color="auto" w:fill="' + r.hl + '"/>' : "");
     var lines = String(r.t == null ? "" : r.t).split("\n");
     return "<w:r>" + (pr ? "<w:rPr>" + pr + "</w:rPr>" : "") + lines.map(function (l, i) { return (i ? "<w:br/>" : "") + '<w:t xml:space="preserve">' + x(l) + "</w:t>"; }).join("") + "</w:r>";
   }
@@ -273,13 +357,14 @@
 
   function buildDOCX(m) {
     var b = [], G = [1250, 3000, 6550];
+    rels = [];
     b.push(para([{ t: m.kicker, b: true, caps: true, color: "6B7280", sz: 16 }], { after: 0 }));
     b.push(para([{ t: m.title, b: true, sz: 36 }], { after: 40 }));
     b.push(para([{ t: "Teacher: " }, { t: m.teacher || "", b: true }, { t: "     Sub: " }, { t: m.sub || "________________", b: true }], { after: 160, rule: true }));
     if (m.duties) {
-      b.push(para([{ t: "\u26a0 DUTIES \u2014 PLEASE DON\u2019T MISS", b: true, color: "B91C1C", sz: 20 }, { t: "\n" + m.duties, b: true, sz: 22 }], { box: "B91C1C", fill: "FDECEC", after: 200, before: 60 }));
+      b.push(para([{ t: "\u26a0 DUTIES \u2014 PLEASE DON\u2019T MISS", b: true, color: "B91C1C", sz: 20 }, { t: "\n" }].concat(linkRuns(autoLink(m.duties), { b: true, sz: 22 })), { box: "B91C1C", fill: "FDECEC", after: 200, before: 60 }));
     }
-    m.info.forEach(function (f) { if (f.value) b.push(para([{ t: f.label + ": ", b: true, color: "4B5563" }, { t: f.value }], { after: 80 })); });
+    m.info.forEach(function (f) { if (f.value) b.push(para([{ t: f.label + ": ", b: true, color: "4B5563" }].concat(linkRuns(autoLink(f.value))), { after: 80 })); });
 
     var hdrB = bd("top", 6, "111827") + bd("bottom", 6, "111827") + bd("left", 6, "111827") + bd("right", 6, "111827");
     var tbl = '<w:tbl><w:tblPr><w:tblW w:w="10800" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblBorders>' + bd("top", 6, "111827") + bd("left", 6, "111827") + bd("bottom", 6, "111827") + bd("right", 6, "111827") + bd("insideH", 4, "111827") + bd("insideV", 4, "111827") +
@@ -300,7 +385,7 @@
       var plan = (r.plan || []).map(function (it) {
         var runs = [];
         if (it.k) runs.push({ t: it.k + " ", b: true });
-        runs.push({ t: it.v, b: !!it.strong, color: it.color === "red" ? "B91C1C" : dim ? "4B5563" : null, sz: dim ? 17 : null });
+        runs = runs.concat(linkRuns(segsOf(it), { b: !!it.strong, color: it.color === "red" ? "B91C1C" : dim ? "4B5563" : null, sz: dim ? 17 : null }));
         return para(runs, { after: 40 });
       });
       tbl += '<w:tr><w:trPr><w:cantSplit/></w:trPr>' + cell(G[0], [para([{ t: r.time, b: true, sz: 18, color: dim ? "6B7280" : null }], { after: 0 })], { fill: fill, borders: borders(0) }) + cell(G[1], cls, { fill: fill, borders: borders(1) }) + cell(G[2], plan, { fill: fill, borders: borders(2) }) + "</w:tr>";
@@ -308,22 +393,22 @@
     tbl += "</w:tbl>";
     b.push(tbl);
     b.push(para([{ t: m.endNotes ? "End-of-day notes" : "End-of-day notes from the sub (how it went, absences, follow-ups)", b: true, caps: true, sz: 16, color: "4B5563" }], { before: 240, after: 60 }));
-    if (m.endNotes) b.push(para([{ t: m.endNotes }]));
+    if (m.endNotes) b.push(para(linkRuns(autoLink(m.endNotes))));
     else for (var i = 0; i < 3; i++) b.push('<w:p><w:pPr><w:tabs><w:tab w:val="right" w:leader="underscore" w:pos="10790"/></w:tabs><w:spacing w:before="160" w:after="60"/></w:pPr><w:r><w:rPr><w:color w:val="9CA3AF"/></w:rPr><w:tab/></w:r></w:p>');
-    if (m.backup) b.push(para([{ t: "If a plan falls through: ", b: true, color: "4B5563" }, { t: m.backup, sz: 18 }], { before: 200 }));
+    if (m.backup) b.push(para([{ t: "If a plan falls through: ", b: true, color: "4B5563" }].concat(linkRuns(m.backup.map ? segsOf({ segs: m.backup }) : autoLink(m.backup), { sz: 18 })), { before: 200 }));
     if (m.thanks) b.push(para([{ t: m.thanks, b: true }], { before: 120 }));
 
     var W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
     var doc = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document ' + W + "><w:body>" + b.join("") +
       '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="360" w:footer="360" w:gutter="0"/></w:sectPr></w:body></w:document>';
     var styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:styles ' + W + '><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="Arial" w:cs="Arial"/><w:sz w:val="19"/><w:szCs w:val="19"/><w:lang w:val="en-CA"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="60" w:line="252" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>' +
-      '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style><w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/><w:tblPr><w:tblInd w:w="0" w:type="dxa"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="108" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="108" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style></w:styles>';
+      '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style><w:style w:type="character" w:styleId="Hyperlink"><w:name w:val="Hyperlink"/><w:uiPriority w:val="99"/><w:unhideWhenUsed/><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr></w:style><w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/><w:tblPr><w:tblInd w:w="0" w:type="dxa"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="108" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="108" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style></w:styles>';
     var now = new Date().toISOString().replace(/\.\d+Z$/, "Z");
     var files = [
       { name: "[Content_Types].xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>' },
       { name: "_rels/.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>' },
       { name: "docProps/core.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>' + x(m.docTitle) + "</dc:title><dc:creator>" + x(m.teacher || "") + '</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">' + now + "</dcterms:created></cp:coreProperties>" },
-      { name: "word/_rels/document.xml.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+      { name: "word/_rels/document.xml.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' + rels.map(function (r) { return '<Relationship Id="' + r.id + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="' + x(r.url) + '" TargetMode="External"/>'; }).join("") + '</Relationships>' },
       { name: "word/document.xml", data: doc },
       { name: "word/styles.xml", data: styles }
     ];
