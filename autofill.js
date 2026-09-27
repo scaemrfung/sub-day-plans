@@ -65,9 +65,9 @@
     var link = { label: "Grade 1 Music · Week " + ref.week, url: url };
     if (ref.kind === "catchup" || ref.kind === "yearend") {
       return { lesson: (ref.kind === "yearend" ? "Last day of school" : "Catch-up week") + " — Grade 1 Music (no new lesson)",
-        materials: "Nothing new. Song scores and the practice studio are on the site.",
-        instructions: (ref.message ? ref.message + " " : "") + "Sing songs the class knows from Week " + ref.week + " and earlier (Song scores page), then play a favourite singing game.",
-        links: [link, { label: "Grade 1 Music · Song scores", url: BASE + "/Grade-1-Music/scores/" }] };
+        materials: "Nothing new. The songs are in the Studio (Copycat songs).",
+        instructions: (ref.message ? ref.message + " " : "") + "Sing songs the class knows from Week " + ref.week + " and earlier (Studio → Copycat songs), then play a favourite singing game.",
+        links: [link, { label: "Grade 1 Music · Copycat songs", url: BASE + "/Grade-1-Music/studio/#copycat" }] };
     }
     var k = ref.cls || 1, of = ref.of || 3, C = (M.c || [])[k - 1];
     var rule = of >= 3 ? "Class " + k + " of 3" : of === 2 ? "Class " + k + " of 2 (short week: skip Class 3)" : "Class 1 only (1 music class this week)";
@@ -103,8 +103,8 @@
     if (!ref.w) {
       return { lesson: "PE · Start-up week: gym routines, signals and name games",
         materials: "Pinnies and soft balls from the equipment room.",
-        instructions: (ref.planNote ? ref.planNote + " " : "") + "Practise the freeze signal, lining up and safe spacing, then play a name or tag game from the PE Playbook games library.",
-        links: [link, { label: "PE Playbook · Games", url: BASE + "/pe-playbook/games.html" }] };
+        instructions: (ref.planNote ? ref.planNote + " " : "") + "Practise the freeze signal, lining up and safe spacing, then play a name or tag game from the PE Playbook Big-Group Games page.",
+        links: [link, { label: "PE Playbook · Big-Group Games", url: BASE + "/pe-playbook/games.html" }] };
     }
     var L = (M.w[ref.w] || {})[ref.c];
     if (!L) return { lesson: "PE · " + ref.month + " Week " + ref.w + " · Class " + ref.c, materials: "", instructions: "See the month page.", links: [link] };
