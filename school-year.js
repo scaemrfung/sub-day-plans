@@ -211,20 +211,29 @@
   }
 
   /* ---- PE month plan on the real calendar ---------------------------------
-     Each school week (1 = Aug 31–Sept 4) teaches one month week (W1–W4).
-     [school week, month, month week, note, theme]  (month week 0 = start-up week)
+     Two things per school week (Week 1 = Aug 31–Sept 4, counted from Aug 31):
+     1. Which month it belongs to: the month it STARTS in (its Monday), so
+        Mon Sept 28–Fri Oct 2 is September. Aug 31 counts as September. Inside a
+        month the weeks are W1, W2, … in order, and the month page has one section
+        per week (month-september.html#week-5 = Week 5).
+     2. What it teaches: PE_WEEKS below points each school week at a lesson set
+        in data.js ([plan month, plan week]), which is where the lessons are kept.
+        The lesson sequence follows the weekly plans; it does not have to match
+        the calendar month (Week 5 in September teaches the October football set).
      Fallback copy only: autofill.js reads the PE Playbook's school-year.js
-     (window.PE_SCHOOL_YEAR) when it loads, so the PE site is the source. */
+     (window.PE_SCHOOL_YEAR) when it loads, so the PE site is the source.
+     [school week, plan month, plan week, note, theme]  (plan week 0 = start-up week;
+     theme is optional and shown next to the week name, e.g. "Week 4 · Football") */
   var PE_WEEKS = [
-    [1, "September", 0, "Start-up week: gym routines, signals and name games. September W1 lessons start Sept 8 (Week 2)."],
+    [1, "September", 0, "Start-up week: gym routines, signals and name games. Soccer starts Sept 8 (Week 2)."],
     [2, "September", 1, "", "Soccer"], [3, "September", 2, "Terry Fox run Fri Sept 18", "Soccer"],
     [4, "September", 3, "Football intro", "Football"],
-    // Week 5 starts October's football (matches the weekly plans), so October–November
-    // run one week early and December W2 (an extra week before) absorbs the shift.
-    // From January on, school weeks and month weeks line up as before.
+    // Week 5 teaches the October football set (matches the weekly plans), so the
+    // October and November sets run one week early; December W2 (an extra set
+    // before) absorbs the shift. From January on nothing moves.
     [5, "October", 1, "", "Football"], [6, "October", 2, "", "Football"], [7, "October", 3], [8, "October", 4],
     [9, "November", 1], [10, "November", 2], [11, "November", 3], [12, "November", 4],
-    [13, "December", 1], [14, "December", 2], [15, "December", 4, "Last week before Christmas: festival stations and closers (W3 is extra games this year)"],
+    [13, "December", 1], [14, "December", 2], [15, "December", 4, "Last week before Christmas: festival stations and closers"],
     [16, "January", 1], [17, "January", 2], [18, "January", 3], [19, "January", 4],
     [20, "February", 1], [21, "February", 2], [22, "February", 3], [23, "February", 4],
     [24, "March", 1], [25, "March", 2], [26, "March", 3], [27, "March", 4, "Right after Spring Break"],
@@ -233,25 +242,39 @@
     [36, "June", 1, "Track and Field Day week"], [37, "June", 2], [38, "June", 3], [39, "June", 4],
     [40, "June", 4, "Last class of the year"]
   ];
-  // Month weeks that have no school week this year.
+  // Lesson sets with no school week this year (shown as extras on that month's page).
   var PE_EXTRA = {
-    "September": { 4: "Soccer and football review — no school week for this one this year (Week 5 goes on to October W1 football). Use it any time." },
-    "December": { 3: "Extra games — no school week for these this year. Use them any time." }
+    "September": { 4: "Soccer and football review — no school week for this set this year. Use it any time." },
+    "December": { 3: "Extra games — no school week for this set this year. Use it any time." }
   };
+  var PE_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  var PE_SCHOOL_MONTHS = ["September", "October", "November", "December", "January", "February", "March", "April", "May", "June"];
+
+  /* Month and in-month week number for every school week (start-month rule). */
+  var PE_CAL = {};
+  (function () {
+    var count = {};
+    WEEKS.forEach(function (w) {
+      var m = PE_MONTHS[+w.monday.slice(5, 7) - 1];
+      if (PE_SCHOOL_MONTHS.indexOf(m) < 0) m = +w.monday.slice(5, 7) >= 7 ? "September" : "June";
+      count[m] = (count[m] || 0) + 1;
+      PE_CAL[w.n] = { month: m, w: count[m] };
+    });
+  })();
 
   function peEntry(n) {
     for (var i = 0; i < PE_WEEKS.length; i++) if (PE_WEEKS[i][0] === n) return PE_WEEKS[i];
     return null;
   }
+  /* month/w = where the week belongs (month page and section); planMonth/planW = its lesson set. */
   function peFromWeek(w, kind) {
-    var e = w && peEntry(w.n);
-    if (!e) return null;
-    return { kind: kind || "week", schoolWeek: w.n, month: e[1], w: e[2], range: w.range, start: w.start, end: w.end,
-      days: w.days, off: w.off, note: w.note, planNote: e[3] || "", theme: e[4] || "",
-      name: "Week " + w.n + (e[4] ? " · " + e[4] : ""), plan: e[2] ? e[1] + " W" + e[2] : e[1] + " start-up" };
+    var e = w && peEntry(w.n), c = w && PE_CAL[w.n];
+    if (!e || !c) return null;
+    return { kind: kind || "week", schoolWeek: w.n, month: c.month, w: c.w, planMonth: e[1], planW: e[2], startup: e[2] === 0,
+      range: w.range, start: w.start, end: w.end, days: w.days, off: w.off, note: w.note, planNote: e[3] || "", theme: e[4] || "",
+      name: "Week " + w.n + (e[4] ? " · " + e[4] : ""), plan: c.month + " W" + c.w };
   }
-  /** PE week for a date (default today): {month, w, range, note, planNote, kind}.
-      kind: week | break (next school week) | summer | before */
+  /** PE week for a date (default today). kind: week | break (next school week) | summer | before */
   function peWeek(k) {
     var st = status(k);
     if (st.kind === "summer") return { kind: "summer" };
@@ -264,25 +287,29 @@
     if (out && CLOSED[st.date]) out.today = "No school today (" + CLOSED[st.date] + ")";
     return out;
   }
-  /** School weeks for one month: [{w, range, note, planNote, schoolWeek}] plus extras. */
-  function peWeeksForMonth(name) {
-    var out = [];
-    WEEKS.forEach(function (w) { var e = peEntry(w.n); if (e && e[1] === name) out.push(peFromWeek(w)); });
-    return out;
+  /** Every school week, in order. */
+  function peWeekList() { return WEEKS.map(function (w) { return peFromWeek(w); }).filter(Boolean); }
+  /** School weeks that belong to a month (start-month rule), in order. */
+  function peWeeksForMonth(name) { return peWeekList().filter(function (x) { return x.month === name; }); }
+  /** Lesson sets of a plan month with no school week: [{planMonth, planW, text}]. */
+  function peExtras(name) {
+    var ex = PE_EXTRA[name] || {};
+    return Object.keys(ex).map(function (k) { return { planMonth: name, planW: +k, text: ex[k] }; });
   }
+  /** Section heading data for a month page: the week(s) in section wk of that month. */
   function peWeekLabel(name, wk) {
     var list = peWeeksForMonth(name).filter(function (x) { return x.w === wk; });
-    if (!list.length) return { extra: true, text: (PE_EXTRA[name] && PE_EXTRA[name][wk]) || "Not scheduled this year" };
+    if (!list.length) return { extra: true, text: "Not scheduled this year" };
     return { extra: false, weeks: list, text: list.map(function (x) {
       return x.range + (x.note ? " · " + x.note : "") + (x.planNote ? " · " + x.planNote : "");
     }).join(" + ") };
   }
 
-
   var API = { config: CAL, weeks: WEEKS, breaks: BREAKS, todayISO: todayISO, status: status, closedReason: closedReason,
     weekOfLesson: weekOfLesson, weekOfDate: function (k) { return weekOfDate(k); }, lessonLine: lessonLine,
     range: function (a, b) { return range(parse(a), parse(b || a)); }, dayLabel: function (k) { return dayLabel(parse(k)); },
-    peWeeks: PE_WEEKS, peWeek: peWeek, peWeeksForMonth: peWeeksForMonth, peWeekLabel: peWeekLabel };
+    peWeeks: PE_WEEKS, peWeek: peWeek, peWeeksForMonth: peWeeksForMonth, peWeekLabel: peWeekLabel,
+    peWeekList: peWeekList, peExtras: peExtras };
   if (root) root.SCHOOL_YEAR = API;
   if (typeof module !== "undefined" && module.exports) module.exports = API;
 })(typeof window !== "undefined" ? window : null);
