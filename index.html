@@ -6,7 +6,7 @@
   <title>Sub Day Plans · Mr. Fung · SCA</title>
   <meta name="description" content="Pick a day, fill in the plan for each block, then print it for a substitute or share a read-only link." />
   <meta name="referrer" content="no-referrer" />
-  <meta name="site-updated" content="2026-09-26T17:35:00Z" />
+  <meta name="site-updated" content="2026-09-27T16:00:00Z" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;650;700&family=Newsreader:opsz,wght@6..72,500;6..72,560;6..72,650&display=swap" rel="stylesheet" />
@@ -50,17 +50,19 @@
       <section class="hero-grid" id="plan">
         <div>
           <p class="kicker">Substitute plans · SCA</p>
-          <h1>Pick a day, fill in each block, then print or share.</h1>
-          <p class="lead">Your timetable is already loaded. Everything saves in this browser as you type. Print a 1–2 page plan, or send the sub a read-only link.</p>
+          <h1>Pick a date, check each block, then print or share.</h1>
+          <p class="lead">Your timetable is already loaded. Music, Health and PE fill in from the lesson sites for the date you pick, and you can change anything. Everything saves in this browser as you type. Print a 1–2 page plan, or send the sub a read-only link.</p>
         </div>
         <aside class="panel">
-          <div class="soft-kicker">Day</div>
-          <div class="day-picker" role="radiogroup" aria-label="Day of the week" id="dayPicker"></div>
-          <label class="field" style="margin-top:12px;">
-            <span>Specific date (optional)</span>
-            <input type="date" id="dateInput" />
-          </label>
+          <div class="soft-kicker">Date</div>
+          <div class="date-row">
+            <label class="field date-field"><span class="sr-only">Date</span><input type="date" id="dateInput" min="2026-08-31" max="2027-06-28" /></label>
+            <button class="btn btn-ghost btn-sm" type="button" id="btnToday">Next school day</button>
+          </div>
           <div class="hint" id="dateHint"></div>
+          <div class="date-cal" id="dateCal" aria-label="School calendar"></div>
+          <div class="soft-kicker" style="margin-top:14px;">Or edit a weekday template</div>
+          <div class="day-picker" role="radiogroup" aria-label="Weekday template" id="dayPicker"></div>
           <div class="save-state" id="saveState" aria-live="polite">Saved in this browser</div>
         </aside>
       </section>
@@ -76,10 +78,12 @@
         </span>
         <button class="btn btn-ghost" type="button" id="btnSaveTemplate">Save as template</button>
         <button class="btn btn-ghost" type="button" id="btnApplyTemplate">Fill from template</button>
+        <button class="btn btn-ghost" type="button" id="btnResetAll" hidden>↺ Reset all to auto-fill</button>
         <button class="btn btn-ghost btn-danger" type="button" id="btnClear">Clear day</button>
       </div>
 
       <h2 id="dayHeading">Monday</h2>
+      <p class="day-summary" id="daySummary"></p>
 
       <section class="cards cards-2" aria-label="Day details" id="dayFields">
         <div class="card">
@@ -192,6 +196,9 @@
   <div id="toast" class="toast no-print" role="status" aria-live="polite"></div>
 
   <script src="schedule.js"></script>
+  <script src="school-year.js"></script>
+  <script src="lesson-catalog.js"></script>
+  <script src="autofill.js"></script>
   <script src="export.js"></script>
   <script src="app.js"></script>
 </body>
