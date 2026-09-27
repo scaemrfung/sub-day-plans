@@ -11,7 +11,8 @@ Plain HTML/CSS/JS. No frameworks, no sign-in, no tracking, no server.
 |---|---|
 | `index.html` | The page (editor, read-only share view, print layout) |
 | `schedule.js` | **Default weekly timetable.** Edit this to change the schedule for everyone |
-| `app.js` | All behaviour: date picker, per-date autosave, auto-fill editing (swap, special activity, reset), copy/template, print, share links, schedule editor |
+| `backup-cards.js` | The **No-prep emergency plans** cards (titles, links, the lesson text "Use in a block" adds). Edit this to change a backup card |
+| `app-1-state.js` … `app-5-schedule-boot.js` | All behaviour, split into five small files loaded in order (one shared script scope): state and plan loading; rendering the editor; editor events; print, PDF/Word and share links; schedule editor, backup cards, stamp and start-up. `SITES` (lesson-site links) is in `app-1-state.js` |
 | `school-year.js` | **School-year settings (review each August).** The EIPS 2026–27 calendar: school days, holidays, PL days, breaks and closures, the 36 lesson weeks with the three catch-up weeks (Dec 14–18, Feb 1–3, June 21–25), and the PE month/week plan. Same settings as `school-year.js` on Grade 1 Music, Grade 5 Health and the PE Playbook. Add `?today=YYYY-MM-DD` to the page address to test a date |
 | `lesson-catalog.js` | Lesson titles and steps copied from Grade 1 Music, Grade 5 Health and the PE Playbook, used for auto-fill. Regenerate after big lesson changes |
 | `autofill.js` | Works out which lesson each Music, Health and PE block gets on a date |

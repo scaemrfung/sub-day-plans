@@ -1,6 +1,6 @@
 /* No-prep backup cards for Sub Day Plans (shown under "No-prep emergency plans").
    Only activities that exist on the linked sites (checked Sept 2026).
-   Loaded before app.js; app.js reads window.SDP_BACKUP_CARDS. */
+   Loaded before the app files; app-1-state.js reads window.SDP_BACKUP_CARDS. */
 (function () {
   "use strict";
   var BASE = "https://scaemrfung.github.io";
