@@ -139,6 +139,14 @@
   }
   var schedDay = currentDay;
   var plan = null;
+  /* Plans are saved per date ("date:YYYY-MM-DD"). The weekday plans ("day:mon" …) are templates:
+     a new date starts from its weekday template, then Music, Health and PE blocks auto-fill. */
+  var currentDate = "";
+  var AF = window.SubAutofill || null, SY = window.SCHOOL_YEAR || null;
+  function closedReason(iso) { return SY ? SY.closedReason(iso) : (/^(sun|sat)$/.test(weekdayKey(iso) || "") ? "Weekend" : null); }
+  function addDays(iso, n) { var d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
+  function todayIso() { return SY ? SY.todayISO() : addDays(new Date().toISOString().slice(0, 10), 0); }
+  function nextSchoolDay(iso) { for (var i = 0; i < 120; i++) { var d = addDays(iso, i); if (!closedReason(d)) return d; } return ""; }
 
   // Teacher name. Older saves used a misspelled default (the name without the final "g");
   // it is fixed on load, but only when the Teacher field is exactly that old default.
@@ -154,7 +162,7 @@
         var k = localStorage.key(i);
         if (!k || k.indexOf(LS) !== 0) continue;
         var name = k.slice(LS.length);
-        if (name.indexOf("day:") !== 0 && name !== "template") continue;
+        if (name.indexOf("day:") !== 0 && name.indexOf("date:") !== 0 && name !== "template") continue;
         var o = lsGet(name, null);
         if (fixTeacher(o)) lsSet(name, o);
       }
@@ -191,7 +199,7 @@
         var key = localStorage.key(i);
         if (!key || key.indexOf(LS) !== 0) continue;
         var name = key.slice(LS.length);
-        if (name.indexOf("day:") !== 0 && name !== "template") continue;
+        if (name.indexOf("day:") !== 0 && name.indexOf("date:") !== 0 && name !== "template") continue;
         var o = lsGet(name, null);
         if (fixPlanLabels(o)) lsSet(name, o);
       }
@@ -204,6 +212,53 @@
     if (!p.blocks) p.blocks = {};
     return p;
   }
+  /* A date's plan: saved one, or a new one started from the weekday template. */
+  function loadDatePlan(date) {
+    var wk = weekdayKey(date);
+    var p = lsGet("date:" + date, null);
+    if (p) { fixTeacher(p); if (!p.blocks) p.blocks = {}; p.date = date; }
+    else {
+      var base = lsGet("day:" + wk, null), sameDay = base && base.date === date;
+      p = emptyPlan(wk); p.date = date;
+      if (base) {
+        DAY_FIELDS.forEach(function (f) { if (sameDay || (f !== "sub" && f !== "endNotes")) p[f] = base[f] || p[f] || ""; });
+        (schedule.days[wk].blocks || []).forEach(function (b) {
+          var from = (base.blocks || {})[blockKey(b)];
+          if (!from) return;
+          var auto = AF && AF.srcOf(b);
+          var t = blockPlan(p, b);
+          t.notes = from.notes || "";
+          // Blocks with a lesson site auto-fill, unless the old weekday plan was written for exactly this date.
+          if (!auto || sameDay) { ["lesson", "materials", "instructions"].forEach(function (f) { t[f] = from[f] || ""; }); t.links = clone(from.links || []); if (auto && (t.lesson || t.instructions)) t.edited = true; }
+        });
+      }
+    }
+    applyAuto(p, date, wk);
+    return p;
+  }
+  /* Fill Music / Health / PE blocks that the teacher hasn't edited. Notes are never touched. */
+  function applyAuto(p, date, wk) {
+    if (!AF || !date) return;
+    (schedule.days[wk].blocks || []).forEach(function (b) { autoBlock(p, b, date); });
+  }
+  function autoBlock(p, b, date) {
+    var src = AF && AF.srcOf(b);
+    if (!src || !date) return;
+    var bp = blockPlan(p, b);
+    if (bp.edited || bp.special) return;
+    var def = AF.resolve(date, b, schedule.days);
+    if (!def) return;
+    var ref = bp.pick ? AF.pickRef(def, src, bp.pick) : def;
+    var c = AF.content(ref, b);
+    bp.lesson = c.lesson; bp.materials = c.materials; bp.instructions = c.instructions; bp.links = c.links;
+    bp.auto = AF.refLabel(ref); bp.autoDefault = AF.refLabel(def);
+  }
+  function resetBlock(b) {
+    var bp = blockPlan(plan, b);
+    delete bp.edited; delete bp.special; delete bp.pick; delete bp.prev;
+    if (AF && AF.srcOf(b)) autoBlock(plan, b, currentDate);
+  }
+  function markEdited(bp) { if (bp && !bp.special && (bp.auto || bp.pick)) bp.edited = true; }
   function blockPlan(p, b) {
     var k = blockKey(b);
     if (!p.blocks[k]) p.blocks[k] = { lesson: "", materials: "", instructions: "", notes: "", links: [] };
@@ -218,7 +273,7 @@
   }
   function savePlanNow() {
     clearTimeout(saveTimer);
-    if (lsSet("day:" + currentDay, plan)) {
+    if (lsSet(currentDate ? "date:" + currentDate : "day:" + currentDay, plan)) {
       var t = new Date().toLocaleTimeString("en-CA", { hour: "numeric", minute: "2-digit" });
       $("#saveState").textContent = "Saved in this browser · " + t;
     }
@@ -228,27 +283,80 @@
   /* ---------- day picker ---------- */
   function renderDayPicker() {
     $("#dayPicker").innerHTML = DAY_KEYS.map(function (k) {
-      return '<button type="button" role="radio" aria-checked="' + (k === currentDay) + '" data-daykey="' + k + '">' + DAY_SHORT[k] + "</button>";
+      return '<button type="button" role="radio" aria-checked="' + (!currentDate && k === currentDay) + '" data-daykey="' + k + '">' + DAY_SHORT[k] + "</button>";
     }).join("");
     var sel = $("#copyFrom");
-    sel.innerHTML = '<option value="">Copy from another day…</option>' + DAY_KEYS.filter(function (k) { return k !== currentDay; }).map(function (k) {
-      return '<option value="' + k + '">Copy from ' + DAY_LONG[k] + "</option>";
+    sel.innerHTML = '<option value="">Copy from another day…</option>' + DAY_KEYS.filter(function (k) { return currentDate || k !== currentDay; }).map(function (k) {
+      return '<option value="' + k + '">Copy from ' + DAY_LONG[k] + (currentDate ? " template" : "") + "</option>";
     }).join("");
   }
   function selectDay(day, keepDate) {
     if (plan) savePlanNow();
-    currentDay = day;
-    lsSet("lastDay", day);
+    currentDay = day; currentDate = "";
+    lsSet("lastDay", day); lsSet("lastDate", "");
     plan = loadPlan(day);
+    plan.date = "";
     renderAll();
+  }
+  function selectDate(date) {
+    var why = closedReason(date);
+    if (why) { toast("No school on " + fmtDate(date) + ": " + why + ". Pick a school day."); return false; }
+    if (plan) savePlanNow();
+    currentDate = date; currentDay = weekdayKey(date);
+    calMonth = date.slice(0, 7);
+    lsSet("lastDate", date); lsSet("lastDay", currentDay);
+    plan = loadDatePlan(date);
+    renderAll();
+    return true;
+  }
+
+  /* ---------- month calendar: non-school days greyed out and labelled ---------- */
+  var calMonth = "", startNote = "";
+  var MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  function shortReason(why) { return why === "Weekend" ? "" : why; }
+  function renderCalendar() {
+    var box = $("#dateCal"); if (!box) return;
+    if (!calMonth) calMonth = (currentDate || todayIso()).slice(0, 7);
+    var y = +calMonth.slice(0, 4), m = +calMonth.slice(5, 7);
+    var first = calMonth + "-01", lead = (new Date(first + "T12:00:00").getDay() + 6) % 7;
+    var daysIn = new Date(y, m, 0).getDate(), today = todayIso(), cells = [], off = [];
+    for (var i = 0; i < lead; i++) cells.push('<span class="cal-cell cal-pad"></span>');
+    for (var d = 1; d <= daysIn; d++) {
+      var iso = calMonth + "-" + ("0" + d).slice(-2), why = closedReason(iso), wk = weekdayKey(iso);
+      var cls = "cal-cell" + (why ? " cal-off" : "") + (why === "Weekend" ? " cal-wkend" : "") + (!why && wk === "wed" ? " cal-short" : "") +
+        (iso === currentDate ? " cal-sel" : "") + (iso === today ? " cal-today" : "");
+      var title = why ? "No school: " + why : fmtDate(iso) + (wk === "wed" ? " · short day (early dismissal)" : "");
+      if (why && why !== "Weekend" && off.every(function (o) { return o.why !== why || o.last !== addDays(iso, -1) && o.last !== addDays(iso, -3); })) off.push({ from: iso, last: iso, why: why });
+      else if (why && why !== "Weekend") { var o = off.filter(function (o) { return o.why === why; }).pop(); o.last = iso; }
+      cells.push('<button type="button" class="' + cls + '" data-date="' + iso + '" title="' + esc(title) + '" aria-label="' + esc(title) + '"' +
+        (why ? ' aria-disabled="true"' : "") + (iso === currentDate ? ' aria-pressed="true"' : "") + ">" + d + "</button>");
+    }
+    function md(iso) { return MONTH_NAMES[+iso.slice(5, 7) - 1].slice(0, 3) + " " + (+iso.slice(8, 10)); }
+    function mdRange(a, b) { return a === b ? md(a) : md(a) + "–" + (a.slice(5, 7) === b.slice(5, 7) ? +b.slice(8, 10) : md(b)); }
+    box.innerHTML = '<div class="cal-head"><button type="button" class="icon-btn" data-cal="-1" aria-label="Previous month">‹</button>' +
+      '<strong>' + MONTH_NAMES[m - 1] + " " + y + '</strong><button type="button" class="icon-btn" data-cal="1" aria-label="Next month">›</button></div>' +
+      '<div class="cal-grid" role="group" aria-label="School days in ' + MONTH_NAMES[m - 1] + '">' +
+      ["M", "T", "W", "T", "F", "S", "S"].map(function (x) { return '<span class="cal-dow">' + x + "</span>"; }).join("") + cells.join("") + "</div>" +
+      '<div class="cal-legend"><span><i class="cal-key cal-key-off"></i>No school</span><span><i class="cal-key cal-key-short"></i>Wed short day</span></div>' +
+      (off.length ? '<ul class="cal-offlist">' + off.map(function (o) {
+        return "<li><b>" + mdRange(o.from, o.last) + "</b> " + esc(o.why) + "</li>";
+      }).join("") + "</ul>" : "");
   }
 
   /* ---------- rendering the editor ---------- */
   function renderAll() {
     renderDayPicker();
-    $("#dayHeading").textContent = DAY_LONG[currentDay] + (plan.date ? " · " + fmtDate(plan.date).replace(/^\w+, /, "") : "");
-    $("#dateInput").value = plan.date || "";
-    $("#dateHint").textContent = plan.date ? "Prints as " + fmtDate(plan.date) + "." : "Pick a date and the weekday selects itself.";
+    renderCalendar();
+    $("#dayHeading").textContent = currentDate ? DAY_LONG[currentDay] + " · " + fmtDate(currentDate).replace(/^\w+, /, "") : DAY_LONG[currentDay] + " template (no date)";
+    var sum = currentDate && AF ? AF.daySummary(currentDate) : "";
+    $("#daySummary").innerHTML = currentDate
+      ? (currentDay === "wed" ? '<span class="badge short-badge">Short day · early dismissal</span> ' : "") + esc(sum) +
+        '<span class="day-summary-note">Music, Health and PE blocks are filled in from the lesson sites for this date. Edit anything; your changes are saved for this date only.</span>'
+      : "Weekday template: plans without a date. A new date starts from its weekday template, then Music, Health and PE fill in by themselves. Pick a date above to plan a real day.";
+    $("#dateInput").value = currentDate || "";
+    $("#dateHint").textContent = currentDate ? "Prints as " + fmtDate(currentDate) + "." : "No date picked: editing the " + DAY_LONG[currentDay] + " template.";
+    if (startNote) { $("#dateHint").textContent = startNote + " " + $("#dateHint").textContent; startNote = ""; }
+    $("#btnResetAll").hidden = !currentDate;
     $all("[data-day]").forEach(function (el) { el.value = plan[el.getAttribute("data-day")] || ""; });
     renderBlocks();
     renderPrint();
@@ -285,15 +393,33 @@
         return '<div class="block minor" data-idx="' + i + '">' + side + '<div class="block-body">' +
           '<label class="field"><span>' + (b.type === "prep" ? "Note (prep — no class)" : "Note (e.g. supervision duty)") + '</span><input type="text" data-bf="notes" value="' + esc(bp.notes) + '" placeholder="' + (b.type === "prep" ? "Nothing needed — prep time" : "e.g. Outside supervision, back field") + '" /></label></div></div>';
       }
+      var src = AF && currentDate ? AF.srcOf(b) : null;
+      var bar = "";
+      if (currentDate) {
+        var badges = bp.special ? '<span class="badge st-special">Special activity</span>' : "";
+        if (src && !bp.special) badges += bp.edited ? '<span class="badge st-edited">Edited</span>' : bp.pick ? '<span class="badge st-swapped">Swapped</span>' : bp.auto ? '<span class="badge st-auto">Auto-filled</span>' : "";
+        var cur = bp.auto ? (bp.special ? "Replaces: " : "From the site: ") + esc(bp.auto) + (bp.pick && bp.autoDefault && bp.autoDefault !== bp.auto ? " (planned: " + esc(bp.autoDefault) + ")" : "") : (src ? "" : "Manual block — no lesson site");
+        var pick = "";
+        if (src && !bp.special) {
+          var def = AF.resolve(currentDate, b, schedule.days);
+          var r = bp.pick ? AF.pickRef(def, src, bp.pick) : def;
+          if (r && r.kind && r.kind !== "lesson") r = { src: src, week: r.week, cls: 1 };
+          if (r) pick = '<details class="swap"' + '><summary>Swap lesson</summary><div class="swap-row">' + AF.pickerHTML(src, r, esc) +
+            '<button type="button" class="btn btn-ghost btn-sm" data-act="usepick">Use this lesson</button></div></details>';
+        }
+        bar = '<div class="auto-bar"><div class="auto-status">' + badges + '<span class="auto-cur">' + cur + "</span></div>" + pick +
+          '<div class="auto-actions"><button type="button" class="btn btn-ghost btn-sm" data-act="special" aria-pressed="' + !!bp.special + '">' + (bp.special ? "✓ Special activity" : "Mark as special activity") + "</button>" +
+          (src && (bp.edited || bp.pick || bp.special) || (!src && bp.special) ? '<button type="button" class="btn btn-ghost btn-sm" data-act="reset">↺ Reset' + (src ? " to auto-fill" : "") + "</button>" : "") + "</div></div>";
+      }
       var links = bp.links.map(function (l, j) {
         return '<div class="link-row" data-link="' + j + '"><input type="text" data-lf="label" value="' + esc(l.label) + '" placeholder="Label" aria-label="Link label" />' +
           '<input type="url" data-lf="url" value="' + esc(l.url) + '" placeholder="https://…" aria-label="Link URL" />' +
           '<button type="button" class="icon-btn" data-act="rmlink" aria-label="Remove link">✕</button></div>';
       }).join("");
-      return '<div class="block" data-idx="' + i + '">' + side + '<div class="block-body">' +
-        '<label class="field full"><span>Lesson / activity</span><input type="text" data-bf="lesson" value="' + esc(bp.lesson) + '" placeholder="e.g. Football week 5: flag pulling tag, then routes" /></label>' +
-        '<label class="field"><span>Materials &amp; where to find them</span><textarea data-bf="materials" rows="2" placeholder="e.g. Flags and pinnies in the blue bin, equipment room">' + esc(bp.materials) + "</textarea></label>" +
-        '<label class="field"><span>Instructions for the sub</span><textarea data-bf="instructions" rows="2" placeholder="Step by step. Where to pick up and drop off the class.">' + esc(bp.instructions) + "</textarea></label>" +
+      return '<div class="block' + (bp.special ? " is-special" : bp.edited ? " is-edited" : "") + '" data-idx="' + i + '">' + side + '<div class="block-body">' + bar +
+        '<label class="field full"><span>' + (bp.special ? "Special activity" : "Lesson / activity") + '</span><input type="text" data-bf="lesson" value="' + esc(bp.lesson) + '" placeholder="' + (bp.special ? "e.g. Remembrance Day assembly in the gym, then back to class" : "e.g. Football week 5: flag pulling tag, then routes") + '" /></label>' +
+        '<label class="field"><span>Materials &amp; where to find them</span><textarea data-bf="materials" rows="' + Math.min(4, Math.max(2, Math.ceil(String(bp.materials || "").length / 55))) + '" placeholder="e.g. Flags and pinnies in the blue bin, equipment room">' + esc(bp.materials) + "</textarea></label>" +
+        '<label class="field"><span>Instructions for the sub</span><textarea data-bf="instructions" rows="' + Math.min(7, Math.max(2, Math.ceil(String(bp.instructions || "").length / 55))) + '" placeholder="Step by step. Where to pick up and drop off the class.">' + esc(bp.instructions) + "</textarea></label>" +
         '<div class="field full"><span>Links</span><div class="links-editor">' + links +
         '<div class="link-add"><select data-act="addsite" aria-label="Add a lesson-site link">' + siteOptions("") + "</select>" +
         (b.link && SITES[b.link] && !bp.links.some(function (l) { return l.url === SITES[b.link].url; }) ? '<button type="button" class="icon-btn" data-act="suggest" data-site="' + b.link + '">+ ' + esc(SITES[b.link].label) + "</button>" : "") +
@@ -303,6 +429,10 @@
     }).join("");
   }
 
+  function currentBlock(el) {
+    var card = el.closest("[data-idx]");
+    return card ? schedule.days[currentDay].blocks[+card.getAttribute("data-idx")] : null;
+  }
   function currentBlockPlan(el) {
     var card = el.closest("[data-idx]");
     if (!card) return null;
@@ -319,12 +449,20 @@
     });
     $("#dateInput").addEventListener("change", function () {
       var v = this.value;
-      if (!v) { plan.date = ""; savePlanNow(); renderAll(); return; }
-      var wk = weekdayKey(v);
-      if (DAY_KEYS.indexOf(wk) < 0) { toast("That date is a weekend. Pick a school day."); this.value = plan.date || ""; return; }
-      if (wk !== currentDay) { savePlanNow(); currentDay = wk; lsSet("lastDay", wk); plan = loadPlan(wk); }
-      plan.date = v; savePlanNow(); renderAll();
+      if (!v) { selectDay(currentDay); return; }
+      if (!selectDate(v)) this.value = currentDate || "";
     });
+    $("#dateCal").addEventListener("click", function (e) {
+      var nav = e.target.closest("[data-cal]");
+      if (nav) {
+        var y = +calMonth.slice(0, 4), m = +calMonth.slice(5, 7) - 1 + (+nav.getAttribute("data-cal"));
+        var d = new Date(y, m, 1); calMonth = d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2);
+        renderCalendar(); return;
+      }
+      var c = e.target.closest("[data-date]");
+      if (c) selectDate(c.getAttribute("data-date"));
+    });
+    $("#btnToday").addEventListener("click", function () { var d = nextSchoolDay(todayIso()); if (d) selectDate(d); else toast("No school days coming up — it’s summer."); });
     $all("[data-day]").forEach(function (el) {
       el.addEventListener("input", function () { plan[el.getAttribute("data-day")] = el.value; savePlanSoon(); renderPrintSoon(); });
     });
@@ -332,15 +470,18 @@
     blocksEl.addEventListener("input", function (e) {
       var el = e.target, bp = currentBlockPlan(el);
       if (!bp) return;
-      if (el.hasAttribute("data-bf")) bp[el.getAttribute("data-bf")] = el.value;
+      var f = el.getAttribute("data-bf");
+      if (f) bp[f] = el.value;
       else if (el.hasAttribute("data-lf")) { var j = +el.closest("[data-link]").getAttribute("data-link"); bp.links[j][el.getAttribute("data-lf")] = el.value; }
       else return;
+      if (f !== "notes" && currentDate && !bp.edited && !bp.special && (bp.auto || bp.pick)) { markEdited(bp); refreshBar(el); }
       savePlanSoon(); renderPrintSoon();
     });
     blocksEl.addEventListener("change", function (e) {
       var el = e.target;
       if (el.getAttribute("data-act") !== "addsite" || !el.value) return;
       var bp = currentBlockPlan(el);
+      markEdited(bp);
       if (el.value === "custom") bp.links.push({ label: "", url: "" });
       else bp.links.push({ label: SITES[el.value].label, url: SITES[el.value].url });
       savePlanNow(); renderBlocks(); renderPrint();
@@ -350,11 +491,49 @@
       if (!btn || btn.tagName === "SELECT") return;
       var bp = currentBlockPlan(btn);
       if (!bp) return;
-      var act = btn.getAttribute("data-act");
-      if (act === "rmlink") bp.links.splice(+btn.closest("[data-link]").getAttribute("data-link"), 1);
-      else if (act === "suggest") { var s = SITES[btn.getAttribute("data-site")]; bp.links.push({ label: s.label, url: s.url }); }
+      var act = btn.getAttribute("data-act"), b = currentBlock(btn);
+      if (act === "rmlink") { markEdited(bp); bp.links.splice(+btn.closest("[data-link]").getAttribute("data-link"), 1); }
+      else if (act === "suggest") { markEdited(bp); var s = SITES[btn.getAttribute("data-site")]; bp.links.push({ label: s.label, url: s.url }); }
+      else if (act === "usepick") {
+        var v = {};
+        $all("[data-pick]", btn.closest(".swap")).forEach(function (sel) { v[sel.getAttribute("data-pick")] = sel.value; });
+        if (bp.edited && !confirm("Replace your edits in this block with the chosen lesson?")) return;
+        delete bp.edited; bp.pick = v;
+        autoBlock(plan, b, currentDate);
+        toast("Swapped to " + bp.auto);
+      }
+      else if (act === "special") {
+        if (!bp.special) {
+          bp.prev = { lesson: bp.lesson, materials: bp.materials, instructions: bp.instructions, links: clone(bp.links), edited: !!bp.edited };
+          bp.special = true; bp.lesson = ""; bp.materials = ""; bp.instructions = ""; bp.links = [];
+        } else {
+          var pv = bp.prev; delete bp.special; delete bp.prev;
+          if (pv) { bp.lesson = pv.lesson; bp.materials = pv.materials; bp.instructions = pv.instructions; bp.links = pv.links || []; if (pv.edited) bp.edited = true; }
+          if (!bp.edited) autoBlock(plan, b, currentDate);
+        }
+      }
+      else if (act === "reset") {
+        if ((bp.edited || bp.special) && !confirm("Reset this block? Your changes to it will be lost (notes stay).")) return;
+        resetBlock(b);
+        toast("Block reset");
+      }
       else return;
       savePlanNow(); renderBlocks(); renderPrint();
+      if (act === "special" && bp.special) { var card = $('#blocks [data-idx="' + schedule.days[currentDay].blocks.indexOf(b) + '"] [data-bf="lesson"]'); if (card) card.focus(); }
+    });
+    // Update the badges of one block without re-rendering (keeps the cursor where it is).
+    function refreshBar(el) {
+      var card = el.closest("[data-idx]"), st = card && card.querySelector(".auto-status .badge");
+      if (st && !card.classList.contains("is-special")) { st.className = "badge st-edited"; st.textContent = "Edited"; card.classList.add("is-edited"); }
+      var acts = card && card.querySelector(".auto-actions");
+      if (acts && !acts.querySelector('[data-act="reset"]')) acts.insertAdjacentHTML("beforeend", '<button type="button" class="btn btn-ghost btn-sm" data-act="reset">↺ Reset to auto-fill</button>');
+    }
+    $("#btnResetAll").addEventListener("click", function () {
+      if (!currentDate) return;
+      if (!confirm("Reset every Music, Health and PE block on " + fmtDate(currentDate) + " to the auto-filled lesson? Edits, swaps and special activities in those blocks are removed. Notes and the rest of the day stay.")) return;
+      schedule.days[currentDay].blocks.forEach(function (b) { var bp = (plan.blocks || {})[blockKey(b)]; if (bp && (AF && AF.srcOf(b) || bp.special)) resetBlock(b); });
+      savePlanNow(); renderBlocks(); renderPrint();
+      toast("All blocks reset to auto-fill");
     });
 
     $("#btnPrint").addEventListener("click", function () { savePlanNow(); renderPrint(); window.print(); });
@@ -364,7 +543,7 @@
     $("#copyFrom").addEventListener("change", function () {
       var from = this.value; this.value = "";
       if (!from) return;
-      if (!confirm("Replace " + DAY_LONG[currentDay] + "’s plan with a copy of " + DAY_LONG[from] + "’s? (The date stays.)")) return;
+      if (!confirm("Replace " + (currentDate ? fmtDate(currentDate) : DAY_LONG[currentDay]) + "’s plan with a copy of the " + DAY_LONG[from] + " template? (The date stays." + (currentDate ? " Auto-filled Music, Health and PE lessons stay; their notes are copied." : "") + ")")) return;
       var src = loadPlan(from);
       copyPlanInto(src, from, { overwrite: true });
       toast("Copied from " + DAY_LONG[from]);
@@ -373,6 +552,7 @@
       savePlanNow();
       var t = clone(plan); t.date = ""; t.sub = ""; t.endNotes = "";
       t.fromDay = currentDay;
+      Object.keys(t.blocks || {}).forEach(function (k) { var x = t.blocks[k]; ["auto", "autoDefault", "pick", "edited", "special", "prev"].forEach(function (f) { delete x[f]; }); });
       lsSet("template", t);
       toast("Saved as your template (without date, sub name and end-of-day notes)");
     });
@@ -383,11 +563,12 @@
       toast("Filled empty fields from your template");
     });
     $("#btnClear").addEventListener("click", function () {
-      if (!confirm("Clear everything on " + DAY_LONG[currentDay] + "? This can’t be undone.")) return;
-      lsDel("day:" + currentDay);
-      plan = emptyPlan(currentDay);
+      var name = currentDate ? fmtDate(currentDate) : "the " + DAY_LONG[currentDay] + " template";
+      if (!confirm("Clear everything on " + name + "? This can’t be undone." + (currentDate ? " The day starts again from its weekday template and auto-fill." : ""))) return;
+      if (currentDate) { lsDel("date:" + currentDate); plan = loadDatePlan(currentDate); }
+      else { lsDel("day:" + currentDay); plan = emptyPlan(currentDay); }
       savePlanNow(); renderAll();
-      toast(DAY_LONG[currentDay] + " cleared");
+      toast("Cleared");
     });
   }
 
@@ -411,8 +592,12 @@
         if (m) { from = src.blocks[blockKey(m)]; used[blockKey(m)] = 1; }
       }
       if (!from && src.blocks[k] && !used[k]) { from = src.blocks[k]; }
-      if (!from) { if (opts.overwrite) delete plan.blocks[k]; return; }
+      if (!from) { if (opts.overwrite && !(currentDate && AF && AF.srcOf(b))) delete plan.blocks[k]; return; }
       var target = blockPlan(plan, b);
+      if (currentDate && AF && AF.srcOf(b) && !target.special && !target.edited) {
+        if (opts.overwrite || !target.notes) target.notes = from.notes || "";
+        return;
+      }
       BLOCK_FIELDS.forEach(function (f) { if (opts.overwrite || !target[f]) target[f] = from[f] || ""; });
       if (opts.overwrite || !target.links.length) target.links = clone(from.links || []);
     });
@@ -438,7 +623,8 @@
         return '<tr class="pv-minor"><td class="pv-time">' + time + "</td><td>" + esc(b.subject || (b.type === "prep" ? "Prep" : "Break")) + "</td><td>" + (bp.notes ? esc(bp.notes) : (b.type === "prep" ? "Prep — no class" : "")) + "</td></tr>";
       }
       var parts = [];
-      if (bp.lesson) parts.push('<div><span class="pv-k">' + esc(bp.lesson) + "</span></div>");
+      if (bp.special) parts.push('<div><span class="pv-k">Special activity' + (bp.lesson ? ": " : "") + "</span>" + (bp.lesson ? '<span class="pv-k">' + esc(bp.lesson) + "</span>" : "") + "</div>");
+      else if (bp.lesson) parts.push('<div><span class="pv-k">' + esc(bp.lesson) + "</span></div>");
       if (bp.materials) parts.push('<div><span class="pv-k">Materials:</span> ' + esc(bp.materials) + "</div>");
       if (bp.instructions) parts.push('<div><span class="pv-k">Instructions:</span> ' + esc(bp.instructions) + "</div>");
       var ls = linkLines(bp.links);
@@ -489,7 +675,8 @@
         return { kind: "minor", time: time, cls: b.subject || (b.type === "prep" ? "Prep" : "Break"), plan: [{ v: bp.notes || (b.type === "prep" ? "Prep — no class" : "") }] };
       }
       var plan = [];
-      if (bp.lesson) plan.push({ v: bp.lesson, strong: true });
+      if (bp.special) plan.push({ v: "Special activity" + (bp.lesson ? ": " + bp.lesson : ""), strong: true });
+      else if (bp.lesson) plan.push({ v: bp.lesson, strong: true });
       if (bp.materials) plan.push({ k: "Materials:", v: bp.materials });
       if (bp.instructions) plan.push({ k: "Instructions:", v: bp.instructions });
       var ls = linkLines(bp.links);
@@ -565,10 +752,12 @@
       var bp = p.blocks[blockKey(b)];
       if (!bp) return;
       bp.links = linkLines(bp.links);
-      var empty = !bp.links.length && BLOCK_FIELDS.every(function (f) { return !bp[f]; });
+      ["auto", "autoDefault", "pick", "edited", "prev"].forEach(function (f) { delete bp[f]; });
+      var empty = !bp.links.length && !bp.special && BLOCK_FIELDS.every(function (f) { return !bp[f]; });
       if (!empty) used[blockKey(b)] = bp;
     });
     p.blocks = used;
+    p.date = currentDate || "";
     return { v: 1, d: currentDay, s: blocks.map(function (b) { return [b.start, b.end, b.cls || "", b.subject || "", b.room || "", b.type || "class", b.with || "", b.orig || "", b.duty || ""]; }), p: p };
   }
   function openShare() {
@@ -727,7 +916,8 @@
   }
   function refreshBackupSelects() {
     var opts = schedule.days[currentDay].blocks.map(function (b, i) { return isMinor(b) ? "" : '<option value="' + i + '">' + esc(b.start + " " + classLabel(b) + " " + (b.subject || "")) + "</option>"; }).join("");
-    $all("[data-backup]").forEach(function (s) { s.innerHTML = '<option value="">Use in a block (' + DAY_SHORT[currentDay] + ")…</option>" + opts; });
+    var when = currentDate ? fmtDate(currentDate).replace(/^\w+, /, "").replace(/, \d{4}$/, "") : DAY_SHORT[currentDay];
+    $all("[data-backup]").forEach(function (s) { s.innerHTML = '<option value="">Use in a block (' + when + ")…</option>" + opts; });
   }
   function bindBackups() {
     $("#backupCards").addEventListener("change", function (e) {
@@ -735,6 +925,7 @@
       var bk = BACKUPS[+s.getAttribute("data-backup")], b = schedule.days[currentDay].blocks[+s.value];
       var bp = blockPlan(plan, b);
       if ((bp.lesson || bp.instructions) && !confirm("That block already has a plan. Replace the lesson and instructions?")) { s.value = ""; return; }
+      markEdited(bp); delete bp.special;
       bp.lesson = bk.lesson; bp.instructions = bk.instructions;
       if (!bp.links.some(function (l) { return l.url === bk.url; })) bp.links.push({ label: bk.site, url: bk.url });
       savePlanNow(); renderBlocks(); renderPrint(); s.value = "";
@@ -764,7 +955,15 @@
     ensureUpdatedStamp(REPO);
     var m = location.hash.match(/^#share=([A-Za-z0-9_-]+)/);
     if (m) { showReadonly(m[1]); return; }
-    plan = loadPlan(currentDay);
+    var last = lsGet("lastDate", null), start = "";
+    if (last && !closedReason(last) && last >= todayIso()) start = last;
+    else if (last === null || last) start = SY ? nextSchoolDay(todayIso()) : "";
+    if (/[?&]today=/.test(location.search) && SY) start = nextSchoolDay(todayIso());
+    if (start && closedReason(start)) start = "";
+    var t0 = todayIso(), why0 = closedReason(t0);
+    if (start && start !== t0 && why0 && why0 !== "Weekend" && start === nextSchoolDay(t0)) startNote = "Today (" + fmtDate(t0).replace(/, \d{4}$/, "") + ") is not a school day: " + why0 + ". Showing the next school day.";
+    if (start) { currentDate = start; currentDay = weekdayKey(start); calMonth = start.slice(0, 7); plan = loadDatePlan(start); }
+    else { plan = loadPlan(currentDay); plan.date = ""; calMonth = todayIso().slice(0, 7); }
     bindEditor(); bindShare(); bindSchedule(); bindBackups();
     renderAll(); renderSchedule(); renderBackups();
     var origRenderAll = renderAll;
