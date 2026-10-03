@@ -9,7 +9,7 @@ Plain HTML/CSS/JS. No frameworks, no sign-in, no tracking, no server.
 ## Files
 | File | What it is |
 |---|---|
-| `index.html` | The page (editor, read-only share view, print layout) |
+| `index.html` | The page (editor, read-only share view, print layout). Carries the baked `site-updated` meta that feeds the "Updated … MT" stamp |
 | `schedule.js` | **Default weekly timetable.** Edit this to change the schedule for everyone |
 | `backup-cards.js` | The **No-prep emergency plans** cards (titles, links, the lesson text "Use in a block" adds). Edit this to change a backup card |
 | `app-1-state.js` … `app-5-schedule-boot.js` | All behaviour, split into five small files loaded in order (one shared script scope): state and plan loading; rendering the editor; editor events; print, PDF/Word and share links; schedule editor, backup cards, stamp and start-up. `SITES` (lesson-site links) is in `app-1-state.js` |
@@ -49,3 +49,5 @@ To bake in changes made on the site: **Weekly schedule → Export JSON**, then p
 - Plans save automatically in the browser's `localStorage` (keys start with `sdp:v1:`): one plan per date (`date:YYYY-MM-DD`) plus one template per weekday (`day:mon` …). There's also one saved template and your edited schedule.
 - **Share online** packs the day's plan into the link itself: deflate-raw (CompressionStream) plus base64url after `#share=`. The part after `#` never reaches a server. Opening the link shows a read-only plan.
 - Don't put private student information here. Share links and printouts can travel.
+
+**Standing rule (Oct 3, 2026): no other-sites footer.** Do not add a "Mr. Fung's sites" footer or any list of links to Mr. Fung's other sites at the bottom of any page (removed at the request of Mr. Fung; the footer markup and `.mf-sites` styles are gone). The `SITES` list in `app-1-state.js` is only for auto-fill/lesson links inside plans, not a footer. Navigation links inside this site are fine.
