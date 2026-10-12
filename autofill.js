@@ -71,7 +71,11 @@
     if (src === "pe") {
       var p = PEY().peWeek(date);
       if (!p || !p.month) return null;
-      var pos = nthInWeek(date, week, b, days);
+      /* Class number = the day's place among this week's school days (closures skipped), same for
+         every class, as in the PE Playbook weekly plans (Day 1 = Class 1 ... Day 4 = Class 4).
+         A 5th school day repeats Class 4 (the Playbook plans make it an apply-the-week day). */
+      var sd = (p.days && p.days.length ? p.days : week.days) || [], di = sd.indexOf(date);
+      var pos = { n: di < 0 ? 1 : di + 1, of: Math.max(sd.length, 1) };
       return { src: "pe", month: p.planMonth || p.month, w: p.planMonth ? p.planW : p.w, calMonth: p.month, calW: p.w, startup: p.planMonth ? !!p.startup : !p.w,
         name: p.name || (p.schoolWeek ? "Week " + p.schoolWeek : ""), c: Math.min(pos.n, 4), n: pos.n, of: pos.of, planNote: p.planNote || "", weekNote: short(week), range: week.range };
     }
@@ -134,7 +138,7 @@
     if (!L) return { lesson: "PE · " + peName(ref) + " · Class " + ref.c, materials: "", instructions: "See the month page.", links: [link] };
     var bd = band(b.cls), bd2 = b.with ? band(b.with) : null, gi = { g12: 6, g34: 7, g56: 8 };
     var ver = (L[gi[bd]] ? BAND[bd] + ": " + L[gi[bd]] + ". " : "") + (bd2 && bd2 !== bd && L[gi[bd2]] ? BAND[bd2] + " (" + b.with + "): " + L[gi[bd2]] + ". " : "");
-    var of = ref.of || 4, cnote = of < 4 && of > 1 ? " (" + of + " PE classes this week)" : "";
+    var of = ref.of || 4, cnote = ref.n > 4 ? " (school day " + ref.n + ": repeat Class 4)" : of < 4 && of > 1 ? " (" + of + "-day school week)" : "";
     return {
       lesson: "PE · " + peName(ref) + " · Class " + ref.c + cnote + " — " + L[0] + (L[1] ? " (" + L[1] + ")" : ""),
       materials: "Equipment is listed on the lesson card (PE Playbook month page).",
