@@ -97,12 +97,13 @@
         links: [link, { label: "Grade 1 Music · Copycat songs", url: BASE + "/Grade-1-Music/studio/#copycat" }] };
     }
     var k = ref.cls || 1, of = ref.of || 3, C = (M.c || [])[k - 1];
-    var rule = of >= 3 ? "Class " + k + " of 3" : of === 2 ? "Class " + k + " of 2 (short week: skip Class 3)" : "Class 1 only (1 music class this week)";
+    var DL = ["Day 1 (Prepare)", "Day 2 (Practice)", "Day 3 (Transfer)"], dl = DL[k - 1] || DL[0];
+    var rule = of >= 3 ? dl : of === 2 ? dl + " (short week: teach Day 1 and Day 2, drop Day 3)" : "Day 1 (Prepare) only (1 music class this week)";
     var steps = C ? C.i.map(function (x) { return x[1] + " (" + x[0] + " min)"; }).join(" → ") : "";
     return {
       lesson: "Grade 1 Music · Week " + ref.week + (M.t ? ": " + M.t : "") + " — " + rule,
       materials: C && C.b ? C.b : "See the week page.",
-      instructions: "Open the Week " + ref.week + " page on the projector and go to “This week in 3 classes” → Class " + k + "." + (steps ? " Plan: " + steps + "." : "") +
+      instructions: "Open the Week " + ref.week + " page on the projector and go to “This week in 3 classes” → " + dl + "." + (steps ? " Plan: " + steps + "." : "") +
         (ref.weekNote ? " " + ref.weekNote + "." : ""),
       links: [link]
     };
@@ -158,7 +159,7 @@
     if (ref.src === "pe") return peName(ref) + (ref.startup ? "" : " · Class " + ref.c);
     if (ref.kind === "catchup") return "Catch-up (after Week " + ref.week + ")";
     if (ref.kind === "yearend") return "Last day";
-    return "Week " + ref.week + (ref.src === "music" ? " · Class " + (ref.cls || 1) : "");
+    return "Week " + ref.week + (ref.src === "music" ? " · " + ["Day 1 (Prepare)", "Day 2 (Practice)", "Day 3 (Transfer)"][(ref.cls || 1) - 1] : "");
   }
   /* Swap: build a reference from picker values, keeping the date's context notes. */
   function pickRef(def, src, v) {
@@ -181,7 +182,7 @@
       var t = src === "music" ? (CAT().music[i] || {}).t : (CAT().health[i] || [])[0];
       weeks.push([i, "Week " + i + (t ? ": " + (t.length > 34 ? t.slice(0, 33) + "…" : t) : "")]);
     }
-    if (src === "music") return sel("week", weeks, ref.week, "Music week") + sel("cls", [[1, "Class 1"], [2, "Class 2"], [3, "Class 3"]], ref.cls || 1, "Music class");
+    if (src === "music") return sel("week", weeks, ref.week, "Music week") + sel("cls", [[1, "Day 1 (Prepare)"], [2, "Day 2 (Practice)"], [3, "Day 3 (Transfer)"]], ref.cls || 1, "Music day");
     if (src === "health") return sel("week", weeks, ref.week, "Health week");
     /* PE: pick the lesson set by school week (as on the PE site), then any extra sets. */
     var P = PEY(), sets = [], seen = {};
