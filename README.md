@@ -26,6 +26,7 @@ Plain HTML/CSS/JS. No frameworks, no sign-in, no tracking, no server.
 - PE blocks have `room: "Gym"`. Wednesday's 6A Library is "Library". The timetable doesn't list other rooms.
 - Recess and lunch are shown as break blocks.
 - **Library supervision duty** is during the middle recess Tuesday to Friday (none on Monday): 11:55–12:15, or 11:52–12:17 on Wednesday. It's set on that recess block (`duty`, room "Library") and in each day's `duties`, which fills in the Duties box on a new plan. Printouts show it in a boxed "Duties" note at the top and a bold DUTY row.
+- **Duty swap until the Christmas Break (from Oct 30, 2026):** on Tuesdays and Fridays Mr. Fung is NOT in the Library at the middle recess; instead he supervises the last recess, 1:59–2:14: Tuesday in the Grade 1–2 area (covering for Kate), Friday in the Grade 3–4 area (covering for Darren). This is `window.DUTY_SWAPS` at the end of `schedule.js`: it applies only to dates before the `Christmas Break` closure in `school-year.js` (last swap day Fri Dec 18), changes the DUTY rows and the Duties box for those dates, and leaves the weekly schedule as it is, so the Tue/Fri Library duty comes back after the break. Wednesday and Thursday Library duty never change.
 
 To bake in changes made on the site: **Weekly schedule → Export JSON**, then paste the JSON after `window.DEFAULT_SCHEDULE =` in `schedule.js`.
 
@@ -35,6 +36,7 @@ To bake in changes made on the site: **Weekly schedule → Export JSON**, then p
 - For the chosen date, each block fills in by itself:
   - **Grade 1 Music (1A–1D):** that week's lesson and the class number. The class number is which music class of the week this is for that class, counting only school days. Short weeks follow the site rule: 2 classes means Class 1 and 2 (skip Class 3); 1 class means Class 1 only. Links to the week page.
   - **Grade 5 Health (5B):** that week's lesson, linked to the week page.
+  - **Kindergarten PE (KA–KD):** that week's lesson from the PE Playbook's Kindergarten PE page (one lesson a week; lesson n goes with the n-th PE school week, start-up week and the 1-day last week left out, same as the Playbook). Linked to the lesson on that page.
   - **PE:** the PE Playbook week plan for that school week, read straight from the PE Playbook's `school-year.js` (so both sites always agree), labelled like **Week 5 · Football (October W1)**, and Class 1–4 by which PE class of the week it is for that class. Warm-up, skill, game, cool-down and the grade-band version are filled in. Links to the month page at that week.
   - **Catch-up weeks and the last day:** a "no new lesson, finish or review" plan instead of a new lesson.
   - **Tech, Social and Library stay manual.** They are never auto-filled.

@@ -29,7 +29,17 @@
     var at = peWhere(ref);
     return at.name ? at.name + " (" + at.tag + ")" : at.tag;
   }
-  var CAT = function () { return window.LESSON_CATALOG || { health: {}, music: {}, pe: {} }; };
+  var CAT = function () { return window.LESSON_CATALOG || { health: {}, music: {}, pe: {}, kpe: [] }; };
+  /* Kindergarten PE (PE Playbook kindergarten.html): one 30-minute lesson a week. Lesson n goes with the n-th PE school
+     week, start-up week and the 1-day last week left out, exactly as the Playbook's own build does. */
+  function isK(cls) { return /^K[A-D]?$/i.test(String(cls || "").trim()); }
+  function kWeeks() { var P = PEY(); return (P.peWeekList ? P.peWeekList() : []).filter(function (x) { return !x.startup && x.days && x.days.length > 1; }); }
+  var MON3 = ["Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sept", "Oct", "Nov", "Dec"];
+  function kMonLabel(x) {
+    if (!x || !x.start) return "";
+    var d = new Date(x.start + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7);
+    return "Week of Mon " + MON3[d.getUTCMonth()] + " " + d.getUTCDate();
+  }
   var MONTHS = ["September", "October", "November", "December", "January", "February", "March", "April", "May", "June"];
   var BAND = { g12: "Grade 1–2", g34: "Grade 3–4", g56: "Grade 5–6" };
 
@@ -68,6 +78,12 @@
     if (!src || !date || !S || S.closedReason(date)) return null;
     var st = S.status(date), week = st.week;
     if (!week) return null;
+    if (src === "pe" && isK(b.cls)) {
+      var kw = kWeeks(), ki = -1;
+      for (var q = 0; q < kw.length; q++) if (kw[q].days.indexOf(date) >= 0) { ki = q; break; }
+      if (ki >= 0 && (CAT().kpe || [])[ki]) return { src: "pe", k: true, kn: ki + 1, weekNote: short(week), range: week.range };
+      /* start-up week or the 1-day last week: no Kindergarten lesson, so the regular PE plan below fills it */
+    }
     if (src === "pe") {
       var p = PEY().peWeek(date);
       if (!p || !p.month) return null;
@@ -124,7 +140,22 @@
       links: [link]
     };
   }
+  function kContent(ref, b) {
+    var L = (CAT().kpe || [])[ref.kn - 1], ml = kMonLabel(kWeeks()[ref.kn - 1]);
+    var link = { label: "PE Playbook · Kindergarten Lesson " + ref.kn, url: BASE + "/pe-playbook/kindergarten.html#k" + ref.kn };
+    if (!L) return { lesson: "Kindergarten PE · Lesson " + ref.kn, materials: "", instructions: "See the Kindergarten PE page.", links: [link] };
+    var w = b && b.with && !isK(b.with) ? " " + b.with + " is in the gym with this class (combined block)." : "";
+    return {
+      lesson: "Kindergarten PE · Lesson " + ref.kn + (ml ? " (" + ml + ")" : "") + " — " + L[0],
+      materials: L[1],
+      instructions: "Warm-up (0–5 min): " + L[2] + " Explore the move (5–12 min): " + L[3] + " Game (12–25 min): " + L[4] +
+        " Cool-down and check-in (25–30 min): " + L[5] + (L[6] ? " Cues: " + L[6] + "." : "") + (L[7] ? " Safety: " + L[7] : "") + w +
+        (ref.weekNote ? " " + ref.weekNote + "." : ""),
+      links: [link]
+    };
+  }
   function peContent(ref, b) {
+    if (ref.k) return kContent(ref, b);
     var M = CAT().pe[ref.month] || { w: {} };
     var at = ref.startup ? { month: ref.calMonth, hash: "#week-" + ref.calW, tag: ref.calMonth + " W" + ref.calW } : peWhere(ref);
     var url = BASE + "/pe-playbook/month-" + at.month.toLowerCase() + ".html" + at.hash;
@@ -156,6 +187,7 @@
   }
   function refLabel(ref) {
     if (!ref) return "";
+    if (ref.src === "pe" && ref.k) return "Kindergarten PE · Lesson " + ref.kn;
     if (ref.src === "pe") return peName(ref) + (ref.startup ? "" : " · Class " + ref.c);
     if (ref.kind === "catchup") return "Catch-up (after Week " + ref.week + ")";
     if (ref.kind === "yearend") return "Last day";
@@ -164,6 +196,7 @@
   /* Swap: build a reference from picker values, keeping the date's context notes. */
   function pickRef(def, src, v) {
     var r = { src: src, weekNote: def && def.weekNote || "", range: def && def.range || "" };
+    if (src === "pe" && def && def.k && v.kn) { r.k = true; r.kn = +v.kn || 1; return r; }
     if (src === "pe") {
       var set = v.pw ? String(v.pw).split("|") : [v.month, v.w]; // v.month/v.w: picks saved before Sept 27, 2026 (plan month and week)
       r.month = set[0]; r.w = +set[1] || 1; r.c = +v.c || 1; r.of = 4; r.planNote = "";
@@ -184,6 +217,10 @@
     }
     if (src === "music") return sel("week", weeks, ref.week, "Music week") + sel("cls", [[1, "Day 1 (Prepare)"], [2, "Day 2 (Practice)"], [3, "Day 3 (Transfer)"]], ref.cls || 1, "Music day");
     if (src === "health") return sel("week", weeks, ref.week, "Health week");
+    if (src === "pe" && ref.k) {
+      var kw = kWeeks(), ko = (CAT().kpe || []).map(function (l, i) { var t = l[0]; return [i + 1, "Lesson " + (i + 1) + ": " + (t.length > 34 ? t.slice(0, 33) + "…" : t) + (kw[i] ? " (" + kMonLabel(kw[i]).replace("Week of ", "") + ")" : "")]; });
+      return sel("kn", ko, ref.kn || 1, "Kindergarten PE lesson");
+    }
     /* PE: pick the lesson set by school week (as on the PE site), then any extra sets. */
     var P = PEY(), sets = [], seen = {};
     (P.peWeekList ? P.peWeekList() : []).forEach(function (x) {

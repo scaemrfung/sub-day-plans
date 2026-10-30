@@ -102,8 +102,8 @@ function bindEditor() {
   });
 
   $("#btnPrint").addEventListener("click", function () { savePlanNow(); renderPrint(); window.print(); });
-  $("#btnPdf").addEventListener("click", function () { savePlanNow(); exportFile("pdf", currentDay, schedule.days[currentDay].blocks, plan); });
-  $("#btnDocx").addEventListener("click", function () { savePlanNow(); exportFile("docx", currentDay, schedule.days[currentDay].blocks, plan); });
+  $("#btnPdf").addEventListener("click", function () { savePlanNow(); exportFile("pdf", currentDay, dayBlocks(currentDay), plan); });
+  $("#btnDocx").addEventListener("click", function () { savePlanNow(); exportFile("docx", currentDay, dayBlocks(currentDay), plan); });
   $("#btnShare").addEventListener("click", openShare);
   $("#copyFrom").addEventListener("change", function () {
     var from = this.value; this.value = "";

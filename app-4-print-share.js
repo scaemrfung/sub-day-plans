@@ -8,7 +8,7 @@
 /* ---------- printable / read-only view ---------- */
 var printTimer;
 function renderPrintSoon() { clearTimeout(printTimer); printTimer = setTimeout(renderPrint, 400); }
-function renderPrint() { $("#printView").innerHTML = planHTML(currentDay, schedule.days[currentDay].blocks, plan); }
+function renderPrint() { $("#printView").innerHTML = planHTML(currentDay, dayBlocks(currentDay), plan); }
 
 function planHTML(day, blocks, p) {
   var title = p.date ? fmtDate(p.date) : DAY_LONG[day] || "Sub plan";
@@ -146,7 +146,7 @@ function decodeShare(s) {
   return p.then(function (b) { return JSON.parse(new TextDecoder().decode(b)); });
 }
 function sharePayload() {
-  var blocks = schedule.days[currentDay].blocks;
+  var blocks = dayBlocks(currentDay);
   var p = clone(plan), used = {};
   blocks.forEach(function (b) {
     var bp = p.blocks[blockKey(b)];

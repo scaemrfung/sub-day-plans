@@ -133,3 +133,22 @@ window.DEFAULT_SCHEDULE = {
     }
   }
 };
+
+/*
+ * Date-bound supervision changes (on top of the weekly schedule, also for a schedule edited on the site).
+ * Mr. Fung, Oct 30 2026: last-recess duty swapped "until Christmas of this year", and he is NOT in the
+ * Library at the middle recess on those days. Applies to dates from `from` up to the day before the
+ * school-year.js closure named in `untilBefore` (Christmas Break starts Mon Dec 21, so the last swap
+ * day is Fri Dec 18). After that the regular Tue/Fri Library duty shows again.
+ *   remove – start time of the break block whose duty is dropped
+ *   add    – start time of the break block that gets this duty (with room)
+ *   duties – replaces the default Duties text on a plan for that date
+ */
+window.DUTY_SWAPS = [
+  { day: "tue", from: "2026-10-30", untilBefore: "Christmas Break", remove: "11:55", add: "1:59",
+    room: "Grade 1–2 area", duty: "Supervision duty (covering for Kate)",
+    duties: "Supervision duty during the last recess, 1:59–2:14, in the Grade 1–2 area (covering for Kate). No Library supervision at the middle recess (until the Christmas Break)." },
+  { day: "fri", from: "2026-10-30", untilBefore: "Christmas Break", remove: "11:55", add: "1:59",
+    room: "Grade 3–4 area", duty: "Supervision duty (covering for Darren)",
+    duties: "Supervision duty during the last recess, 1:59–2:14, in the Grade 3–4 area (covering for Darren). No Library supervision at the middle recess (until the Christmas Break)." }
+];

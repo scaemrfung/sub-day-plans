@@ -166,6 +166,8 @@ function loadDatePlan(date) {
       });
     }
   }
+  var ds = dutySwapFor(date);
+  if (ds && (!p.duties || p.duties === (schedule.days[wk] || {}).duties)) p.duties = ds.duties;
   applyAuto(p, date, wk);
   return p;
 }
@@ -212,3 +214,24 @@ function savePlanNow() {
   }
 }
 function saveSchedule() { lsSet("schedule", schedule); }
+/* Date-bound duty swaps (schedule.js DUTY_SWAPS). The weekly schedule itself is never changed; the blocks
+   shown, printed, exported and shared for a date get the swapped duty. Dates come from school-year.js. */
+function dutySwapFor(date) {
+  if (!date) return null;
+  var wk = weekdayKey(date), closed = (SY && SY.config && SY.config.closed) || [];
+  return (window.DUTY_SWAPS || []).filter(function (s) {
+    if (s.day !== wk || date < s.from) return false;
+    var c = closed.filter(function (x) { return x[2] === s.untilBefore && x[0] >= s.from; })[0];
+    return !!c && date < c[0];
+  })[0] || null;
+}
+function dayBlocks(day) {
+  var bl = (schedule.days[day] && schedule.days[day].blocks) || [], s = currentDate && weekdayKey(currentDate) === day ? dutySwapFor(currentDate) : null;
+  if (!s) return bl;
+  return bl.map(function (b) {
+    if (b.type !== "break") return b;
+    if (b.start === s.add) return Object.assign({}, b, { duty: s.duty, room: s.room });
+    if (b.start === s.remove && b.duty) return Object.assign({}, b, { duty: "", room: "" });
+    return b;
+  });
+}

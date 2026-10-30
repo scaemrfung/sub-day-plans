@@ -94,7 +94,7 @@ function siteOptions(selected) {
 }
 
 function renderBlocks() {
-  var blocks = schedule.days[currentDay].blocks;
+  var blocks = dayBlocks(currentDay);
   if (!blocks.length) {
     $("#blocks").innerHTML = '<div class="card">No blocks for this day yet. Add some in <a href="#schedule">Weekly schedule</a>.</div>';
     return;

@@ -22,8 +22,13 @@ for(const n in P){ if(!music[n]) continue; music[n].c=P[n].map(c=>({b:c.b,i:c.i.
 // pe
 const pe={};
 for(const mo of PE.months){ pe[mo.name]={w:{}}; for(const L of mo.lessons){ (pe[mo.name].w[L.w]=pe[mo.name].w[L.w]||{})[L.c]=[L.title,L.focus,L.wu,L.skill,L.game,L.cd,L.g12||"",L.g34||"",L.g56||""].map(s=>SYP.fill(String(s||"")).replace(/<[^>]+>/g,"")); } }
-const out={generated:new Date().toISOString().slice(0,10),health,music,pe};
-console.log(Object.keys(health).length,Object.keys(music).length,Object.values(music).filter(x=>x.c).length);
+// kindergarten PE (pe-playbook/kindergarten-data.js): one lesson a week, in order of the PE school weeks
+const kpe=[];
+if(fs.existsSync(SRC+"/pe-playbook/kindergarten-data.js")){ const w={}; new Function("window",fs.readFileSync(SRC+"/pe-playbook/kindergarten-data.js","utf8"))(w);
+  const plain=(s)=>String(s||"").replace(/\[\[([^\]]+)\]\]/g,"$1").replace(/<[^>]+>/g,"");
+  for(const l of w.K_PE.lessons) kpe.push([l.t,l.eq,l.wu,l.skill,l.game,l.cd,l.cues,l.safe||"",l.m].map(plain)); }
+const out={generated:new Date().toISOString().slice(0,10),health,music,pe,kpe};
+console.log("kpe",kpe.length,Object.keys(health).length,Object.keys(music).length,Object.values(music).filter(x=>x.c).length);
 const js="/* Lesson titles for auto-fill, copied from the lesson sites (Grade 5 Health, Grade 1 Music, PE Playbook).\n   Regenerate after big lesson changes (see README). */\nwindow.LESSON_CATALOG = "+JSON.stringify(out)+";\n";
 fs.writeFileSync("lesson-catalog.js",js);
 console.log(js.length);
