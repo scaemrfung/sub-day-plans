@@ -81,7 +81,11 @@
     if (src === "pe" && isK(b.cls)) {
       var kw = kWeeks(), ki = -1;
       for (var q = 0; q < kw.length; q++) if (kw[q].days.indexOf(date) >= 0) { ki = q; break; }
-      if (ki >= 0 && (CAT().kpe || [])[ki]) return { src: "pe", k: true, kn: ki + 1, weekNote: short(week), range: week.range };
+      if (ki >= 0 && (CAT().kpe || [])[ki]) {
+        /* A combined grade class (e.g. KC (1C)) keeps its own regular PE plan, exactly as before the Kindergarten page. */
+        var wr = b.with && !isK(b.with) ? resolve(date, { cls: b.with, with: "", subject: b.subject, type: b.type, start: b.start }, days) : null;
+        return { src: "pe", k: true, kn: ki + 1, weekNote: short(week), range: week.range, withCls: wr ? b.with : "", withRef: wr };
+      }
       /* start-up week or the 1-day last week: no Kindergarten lesson, so the regular PE plan below fills it */
     }
     if (src === "pe") {
@@ -144,18 +148,29 @@
     var L = (CAT().kpe || [])[ref.kn - 1], ml = kMonLabel(kWeeks()[ref.kn - 1]);
     var link = { label: "PE Playbook · Kindergarten Lesson " + ref.kn, url: BASE + "/pe-playbook/kindergarten.html#k" + ref.kn };
     if (!L) return { lesson: "Kindergarten PE · Lesson " + ref.kn, materials: "", instructions: "See the Kindergarten PE page.", links: [link] };
-    var w = b && b.with && !isK(b.with) ? " " + b.with + " is in the gym with this class (combined block)." : "";
     return {
       lesson: "Kindergarten PE · Lesson " + ref.kn + (ml ? " (" + ml + ")" : "") + " — " + L[0],
       materials: L[1],
       instructions: "Warm-up (0–5 min): " + L[2] + " Explore the move (5–12 min): " + L[3] + " Game (12–25 min): " + L[4] +
-        " Cool-down and check-in (25–30 min): " + L[5] + (L[6] ? " Cues: " + L[6] + "." : "") + (L[7] ? " Safety: " + L[7] : "") + w +
+        " Cool-down and check-in (25–30 min): " + L[5] + (L[6] ? " Cues: " + L[6] + "." : "") + (L[7] ? " Safety: " + L[7] : "") +
         (ref.weekNote ? " " + ref.weekNote + "." : ""),
       links: [link]
     };
   }
+  /* Kindergarten lesson for the K class, plus the combined grade class's own unchanged PE plan. */
+  function kBlockContent(ref, b) {
+    var c = kContent(ref, b);
+    if (!ref.withRef) return c;
+    var g = peContent(ref.withRef, { cls: ref.withCls, with: "" }), n = ref.withCls;
+    return {
+      lesson: (b && b.cls || "K") + ": " + c.lesson + " | " + n + ": " + g.lesson,
+      materials: (b && b.cls || "K") + ": " + c.materials + " | " + n + ": " + g.materials,
+      instructions: (b && b.cls || "K") + ": " + c.instructions + " | " + n + ": " + g.instructions,
+      links: c.links.concat(g.links)
+    };
+  }
   function peContent(ref, b) {
-    if (ref.k) return kContent(ref, b);
+    if (ref.k) return kBlockContent(ref, b);
     var M = CAT().pe[ref.month] || { w: {} };
     var at = ref.startup ? { month: ref.calMonth, hash: "#week-" + ref.calW, tag: ref.calMonth + " W" + ref.calW } : peWhere(ref);
     var url = BASE + "/pe-playbook/month-" + at.month.toLowerCase() + ".html" + at.hash;
@@ -187,7 +202,7 @@
   }
   function refLabel(ref) {
     if (!ref) return "";
-    if (ref.src === "pe" && ref.k) return "Kindergarten PE · Lesson " + ref.kn;
+    if (ref.src === "pe" && ref.k) return "Kindergarten PE · Lesson " + ref.kn + (ref.withRef ? " · " + ref.withCls + ": " + refLabel(ref.withRef) : "");
     if (ref.src === "pe") return peName(ref) + (ref.startup ? "" : " · Class " + ref.c);
     if (ref.kind === "catchup") return "Catch-up (after Week " + ref.week + ")";
     if (ref.kind === "yearend") return "Last day";
@@ -196,7 +211,7 @@
   /* Swap: build a reference from picker values, keeping the date's context notes. */
   function pickRef(def, src, v) {
     var r = { src: src, weekNote: def && def.weekNote || "", range: def && def.range || "" };
-    if (src === "pe" && def && def.k && v.kn) { r.k = true; r.kn = +v.kn || 1; return r; }
+    if (src === "pe" && def && def.k && v.kn) { r.k = true; r.kn = +v.kn || 1; r.withCls = def.withCls; r.withRef = def.withRef; return r; }
     if (src === "pe") {
       var set = v.pw ? String(v.pw).split("|") : [v.month, v.w]; // v.month/v.w: picks saved before Sept 27, 2026 (plan month and week)
       r.month = set[0]; r.w = +set[1] || 1; r.c = +v.c || 1; r.of = 4; r.planNote = "";
