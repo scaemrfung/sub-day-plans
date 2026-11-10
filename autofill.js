@@ -79,9 +79,19 @@
      school day) counts as Early September, as the PE calendar already does; there is no Late
      December lesson, so any December school days after the 15th stay on Lesson 7; "January,
      after the break" is January 1–15 (school resumes after Christmas Break); Lesson 18 covers
-     all of June. */
+     all of June.
+     4A, 4B and 4C always share one lesson in a school week: the Early/Late rule is applied to
+     that week's Monday, even if Monday is a holiday, so a week that spans two months follows
+     the starting month (same idea as the school calendar). */
+  function weekMonday(iso) {
+    var d = new Date(iso + "T12:00:00Z");
+    if (isNaN(d.getTime())) return iso;
+    d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7);
+    return d.toISOString().slice(0, 10);
+  }
   function techLessonNum(iso) {
     if (!iso) return 0;
+    iso = weekMonday(iso);
     var mo = +iso.slice(5, 7), d = +iso.slice(8, 10);
     if (mo === 8) { mo = 9; d = 1; }
     var early = d <= 15;
