@@ -21,9 +21,10 @@ var SITES = {
   music:   { label: "Grade 1 Music",          url: BASE + "/Grade-1-Music/" },
   studio:  { label: "Grade 1 Music · Practice studio", url: BASE + "/Grade-1-Music/studio/" },
   mps:     { label: "Music Practice Studio",  url: BASE + "/music-practice-studio/" },
-  scratch: { label: "Grade 6 Scratch",        url: BASE + "/Grade-6-Scratch/" }
+  scratch: { label: "Grade 6 Scratch",        url: BASE + "/Grade-6-Scratch/" },
+  g4tech:  { label: "Grade 4 Tech",           url: BASE + "/Grade4-Tech/" }
 };
-var SITE_ORDER = ["pe", "warmup", "health", "imovie", "canva", "music", "studio", "mps", "scratch"];
+var SITE_ORDER = ["pe", "warmup", "health", "imovie", "canva", "music", "studio", "mps", "scratch", "g4tech"];
 
 /* Backup cards live in backup-cards.js (loaded before this file). */
 var BACKUPS = window.SDP_BACKUP_CARDS || [];
@@ -73,7 +74,7 @@ if (DAY_KEYS.indexOf(currentDay) < 0) {
 var schedDay = currentDay;
 var plan = null;
 /* Plans are saved per date ("date:YYYY-MM-DD"). The weekday plans ("day:mon" …) are templates:
-   a new date starts from its weekday template, then Music, Health and PE blocks auto-fill. */
+   a new date starts from its weekday template, then Music, Health, PE and Grade 4 Tech blocks auto-fill. */
 var currentDate = "";
 var AF = window.SubAutofill || null, SY = window.SCHOOL_YEAR || null;
 function closedReason(iso) { return SY ? SY.closedReason(iso) : (/^(sun|sat)$/.test(weekdayKey(iso) || "") ? "Weekend" : null); }
@@ -171,7 +172,7 @@ function loadDatePlan(date) {
   applyAuto(p, date, wk);
   return p;
 }
-/* Fill Music / Health / PE blocks that the teacher hasn't edited. Notes are never touched. */
+/* Fill Music / Health / PE / Grade 4 Tech blocks that the teacher hasn't edited. Notes are never touched. */
 function applyAuto(p, date, wk) {
   if (!AF || !date) return;
   (schedule.days[wk].blocks || []).forEach(function (b) { autoBlock(p, b, date); });
@@ -181,6 +182,11 @@ function autoBlock(p, b, date) {
   if (!src || !date) return;
   var bp = blockPlan(p, b);
   if (bp.edited || bp.special) return;
+  /* A plan typed before this subject was auto-filled has no edited/auto flag. Keep that text. */
+  if (!bp.auto && !bp.pick && (bp.lesson || bp.materials || bp.instructions || (bp.links && bp.links.length))) {
+    bp.edited = true;
+    return;
+  }
   var def = AF.resolve(date, b, schedule.days);
   if (!def) return;
   var ref = bp.pick ? AF.pickRef(def, src, bp.pick) : def;

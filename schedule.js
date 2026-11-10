@@ -44,7 +44,7 @@ window.DEFAULT_SCHEDULE = {
         { start: "1:26",  end: "1:59",  cls: "3C",      subject: "PE",     room: "Gym", type: "class", link: "pe" },
         { start: "1:59",  end: "2:14",  cls: "",        subject: "Recess", room: "", type: "break" },
         { start: "2:14",  end: "2:47",  cls: "1A",      subject: "Music",  room: "", type: "class", link: "music" },
-        { start: "2:47",  end: "3:19",  cls: "4A",      subject: "Tech",   room: "", type: "class" }
+        { start: "2:47",  end: "3:19",  cls: "4A",      subject: "Tech",   room: "", type: "class", link: "g4tech" }
       ]
     },
     tue: {
@@ -64,7 +64,7 @@ window.DEFAULT_SCHEDULE = {
         { start: "12:53", end: "1:26",  cls: "1D",      subject: "Music",  room: "", type: "class", link: "music" },
         { start: "1:26",  end: "1:59",  cls: "3C", with: "4A", orig: "3C (4A)", subject: "PE",     room: "Gym", type: "class", link: "pe" },
         { start: "1:59",  end: "2:14",  cls: "",        subject: "Recess", room: "", type: "break" },
-        { start: "2:14",  end: "2:47",  cls: "4B",      subject: "Tech",   room: "", type: "class" },
+        { start: "2:14",  end: "2:47",  cls: "4B",      subject: "Tech",   room: "", type: "class", link: "g4tech" },
         { start: "2:47",  end: "3:19",  cls: "5B",      subject: "Health", room: "", type: "class", link: "health" }
       ]
     },
@@ -75,7 +75,7 @@ window.DEFAULT_SCHEDULE = {
       blocks: [
         { start: "8:37",  end: "9:04",  cls: "6A", with: "5C", orig: "6A (5C)", subject: "PE",      room: "Gym", type: "class", link: "pe" },
         { start: "9:04",  end: "9:31",  cls: "6A",       subject: "Library", room: "Library", type: "class" },
-        { start: "9:31",  end: "9:58",  cls: "4C",       subject: "Tech",    room: "", type: "class" },
+        { start: "9:31",  end: "9:58",  cls: "4C",       subject: "Tech",    room: "", type: "class", link: "g4tech" },
         { start: "9:58",  end: "10:13", cls: "",         subject: "Recess",  room: "", type: "break" },
         { start: "10:13", end: "10:40", cls: "KA/KB",    subject: "Social",  room: "", type: "class" },
         { start: "10:40", end: "11:07", cls: "KC/KD",    subject: "Social",  room: "", type: "class" },

@@ -1,8 +1,8 @@
-/* Auto-fill for Sub Day Plans: which Music, Health and PE lesson is taught on a date.
+/* Auto-fill for Sub Day Plans: which Music, Health, PE and Grade 4 Tech lesson is taught on a date.
    Uses school-year.js (calendar), the PE Playbook's school-year.js (PE week plan) and
    lesson-catalog.js (lesson titles from the sites).
-   Only Grade 1 Music, Grade 5 Health and PE blocks are filled. Tech, Social and
-   Library stay manual. Every filled block can still be edited, swapped or reset. */
+   Grade 1 Music, Grade 5 Health, PE and Grade 4 Tech (4A, 4B, 4C) are filled. Social,
+   Library and Grade 6 Tech stay manual. Every filled block can still be edited, swapped or reset. */
 (function () {
   "use strict";
   var BASE = "https://scaemrfung.github.io";
@@ -29,7 +29,7 @@
     var at = peWhere(ref);
     return at.name ? at.name + " (" + at.tag + ")" : at.tag;
   }
-  var CAT = function () { return window.LESSON_CATALOG || { health: {}, music: {}, pe: {}, kpe: [] }; };
+  var CAT = function () { return window.LESSON_CATALOG || { health: {}, music: {}, pe: {}, kpe: [], g4tech: {} }; };
   /* Kindergarten PE (PE Playbook kindergarten.html): one 30-minute lesson a week. Lesson n goes with the n-th PE school
      week, start-up week and the 1-day last week left out, exactly as the Playbook's own build does. */
   function isK(cls) { return /^K[A-D]?$/i.test(String(cls || "").trim()); }
@@ -50,6 +50,7 @@
     if (s === "music" && /^1[A-D]$/i.test(b.cls || "")) return "music";
     if (s === "health" && /^5/.test(b.cls || "")) return "health";
     if (s === "pe") return "pe";
+    if (s === "tech" && /^4[A-C]$/i.test(b.cls || "")) return "tech";
     return null;
   }
   function band(cls) {
@@ -71,6 +72,31 @@
     return { n: me < 0 ? 1 : me + 1, of: Math.max(list.length, 1) };
   }
   function short(week) { return week && week.note ? week.note : ""; }
+
+  /* Grade 4 Tech year map (Grade4-Tech content/lessons.py "window" field). The site calls these
+     suggested blocks "approximate only" and "not a booked calendar." Early = days 1–15 of that
+     month, late = day 16 to the end. Special cases taken from the same windows: Aug 31 (first
+     school day) counts as Early September, as the PE calendar already does; there is no Late
+     December lesson, so any December school days after the 15th stay on Lesson 7; "January,
+     after the break" is January 1–15 (school resumes after Christmas Break); Lesson 18 covers
+     all of June. */
+  function techLessonNum(iso) {
+    if (!iso) return 0;
+    var mo = +iso.slice(5, 7), d = +iso.slice(8, 10);
+    if (mo === 8) { mo = 9; d = 1; }
+    var early = d <= 15;
+    if (mo === 9) return early ? 1 : 2;
+    if (mo === 10) return early ? 3 : 4;
+    if (mo === 11) return early ? 5 : 6;
+    if (mo === 12) return 7;
+    if (mo === 1) return early ? 8 : 9;
+    if (mo === 2) return early ? 10 : 11;
+    if (mo === 3) return early ? 12 : 13;
+    if (mo === 4) return early ? 14 : 15;
+    if (mo === 5) return early ? 16 : 17;
+    if (mo === 6) return 18;
+    return 0;
+  }
 
   /* Default lesson reference for this block on this date (null = manual block). */
   function resolve(date, b, days) {
@@ -98,6 +124,11 @@
       var pos = { n: di < 0 ? 1 : di + 1, of: Math.max(sd.length, 1) };
       return { src: "pe", month: p.planMonth || p.month, w: p.planMonth ? p.planW : p.w, calMonth: p.month, calW: p.w, startup: p.planMonth ? !!p.startup : !p.w,
         name: p.name || (p.schoolWeek ? "Week " + p.schoolWeek : ""), c: Math.min(pos.n, 4), n: pos.n, of: pos.of, planNote: p.planNote || "", weekNote: short(week), range: week.range };
+    }
+    if (src === "tech") {
+      var tn = techLessonNum(date);
+      if (!tn || !(CAT().g4tech || {})[tn]) return null;
+      return { src: "tech", n: tn, weekNote: short(week), range: week.range };
     }
     var ref = { src: src, kind: st.kind, week: st.lesson || 1, weekNote: short(week), range: week.range, message: st.message || "" };
     if (src === "music") {
@@ -194,9 +225,31 @@
       links: [link]
     };
   }
+  function techContent(ref) {
+    var L = (CAT().g4tech || {})[ref.n] || {}, slug = L.slug || ("0" + ref.n).slice(-2);
+    var url = BASE + "/Grade4-Tech/lesson/" + slug + "/";
+    var ppt = BASE + "/Grade4-Tech/assets/pptx/grade4-tech-lesson" + slug + ".pptx";
+    var flex = L.kind === "flex" ? " (flex review)" : "";
+    var links = [
+      { label: "Grade 4 Tech · Lesson " + ref.n, url: url },
+      { label: "Lesson " + ref.n + " PowerPoint", url: ppt }
+    ];
+    if (L.sourceUrl) links.push({ label: "Common Sense: " + (L.sourceTitle || "lesson"), url: L.sourceUrl });
+    return {
+      lesson: "Grade 4 Tech · Lesson " + ref.n + flex + (L.title ? ": " + L.title : "") + (L.window ? " — " + L.window : ""),
+      materials: (L.materials ? L.materials : "The lesson page, the PowerPoint, a board and a timer.") + " No Chromebooks.",
+      instructions: "This is a 30-minute teacher-led lesson (5 minutes opening, 8 minutes explain, 12 minutes activity, 5 minutes check). No Chromebooks. Open the Lesson " + ref.n + " page on the projector, or use the PowerPoint, and follow the steps on the page." +
+        (L.question ? " Big question: " + L.question : "") +
+        (L.summary ? " " + L.summary : "") +
+        (L.sub ? " For a sub: " + L.sub : "") +
+        " The year map is approximate (about every two weeks); if the class is on a different lesson, use Swap lesson." +
+        (ref.weekNote ? " " + ref.weekNote + "." : ""),
+      links: links
+    };
+  }
   function content(ref, b) {
     if (!ref) return null;
-    var c = ref.src === "music" ? musicContent(ref, b) : ref.src === "health" ? healthContent(ref, b) : peContent(ref, b);
+    var c = ref.src === "music" ? musicContent(ref, b) : ref.src === "health" ? healthContent(ref, b) : ref.src === "tech" ? techContent(ref) : peContent(ref, b);
     c.lesson = c.lesson.replace(/\.\./g, "."); c.instructions = c.instructions.replace(/\.\.+/g, ".").replace(/\s+/g, " ").trim();
     return c;
   }
@@ -204,6 +257,10 @@
     if (!ref) return "";
     if (ref.src === "pe" && ref.k) return "Kindergarten PE · Lesson " + ref.kn + (ref.withRef ? " · " + ref.withCls + ": " + refLabel(ref.withRef) : "");
     if (ref.src === "pe") return peName(ref) + (ref.startup ? "" : " · Class " + ref.c);
+    if (ref.src === "tech") {
+      var T = (CAT().g4tech || {})[ref.n] || {};
+      return "Lesson " + ref.n + (T.title ? ": " + T.title : "");
+    }
     if (ref.kind === "catchup") return "Catch-up (after Week " + ref.week + ")";
     if (ref.kind === "yearend") return "Last day";
     return "Week " + ref.week + (ref.src === "music" ? " · " + ["Day 1 (Prepare)", "Day 2 (Practice)", "Day 3 (Transfer)"][(ref.cls || 1) - 1] : "");
@@ -216,6 +273,7 @@
       var set = v.pw ? String(v.pw).split("|") : [v.month, v.w]; // v.month/v.w: picks saved before Sept 27, 2026 (plan month and week)
       r.month = set[0]; r.w = +set[1] || 1; r.c = +v.c || 1; r.of = 4; r.planNote = "";
     }
+    else if (src === "tech") { r.n = +v.n || 1; }
     else { r.kind = "lesson"; r.week = +v.week; if (src === "music") { r.cls = +v.cls; r.of = 3; } }
     return r;
   }
@@ -232,6 +290,14 @@
     }
     if (src === "music") return sel("week", weeks, ref.week, "Music week") + sel("cls", [[1, "Day 1 (Prepare)"], [2, "Day 2 (Practice)"], [3, "Day 3 (Transfer)"]], ref.cls || 1, "Music day");
     if (src === "health") return sel("week", weeks, ref.week, "Health week");
+    if (src === "tech") {
+      var to = [];
+      for (var n = 1; n <= 18; n++) {
+        var L = (CAT().g4tech || {})[n] || {}, t = L.title || "";
+        to.push([n, "Lesson " + n + (L.kind === "flex" ? " (flex)" : "") + (t ? ": " + (t.length > 34 ? t.slice(0, 33) + "…" : t) : "") + (L.window ? " — " + L.window : "")]);
+      }
+      return sel("n", to, ref.n || 1, "Grade 4 Tech lesson");
+    }
     if (src === "pe" && ref.k) {
       var kw = kWeeks(), ko = (CAT().kpe || []).map(function (l, i) { var t = l[0]; return [i + 1, "Lesson " + (i + 1) + ": " + (t.length > 34 ? t.slice(0, 33) + "…" : t) + (kw[i] ? " (" + kMonLabel(kw[i]).replace("Week of ", "") + ")" : "")]; });
       return sel("kn", ko, ref.kn || 1, "Kindergarten PE lesson");
@@ -264,6 +330,8 @@
     else if (st.kind === "catchup") parts.push("Music & Health: catch-up week (no new lesson)");
     else if (st.kind === "yearend") parts.push("Last day of school");
     if (p && p.month) parts.push("PE: " + peName({ month: p.planMonth, w: p.planW, calMonth: p.month, calW: p.w, startup: !!p.startup, name: p.name || "" }));
+    var tn = techLessonNum(date), TL = (CAT().g4tech || {})[tn];
+    if (tn && TL) parts.push("Grade 4 Tech: Lesson " + tn + (TL.title ? " — " + TL.title : ""));
     if (w.note) parts.push(w.note);
     return parts.join(" · ");
   }
