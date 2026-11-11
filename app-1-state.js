@@ -22,9 +22,10 @@ var SITES = {
   studio:  { label: "Grade 1 Music · Practice studio", url: BASE + "/Grade-1-Music/studio/" },
   mps:     { label: "Music Practice Studio",  url: BASE + "/music-practice-studio/" },
   scratch: { label: "Grade 6 Scratch",        url: BASE + "/Grade-6-Scratch/" },
-  g4tech:  { label: "Grade 4 Tech",           url: BASE + "/Grade4-Tech/" }
+  g4tech:  { label: "Grade 4 Tech",           url: BASE + "/Grade4-Tech/" },
+  kss:     { label: "Kindergarten Social Studies", url: BASE + "/kindergarten-social-studies/" }
 };
-var SITE_ORDER = ["pe", "warmup", "health", "imovie", "canva", "music", "studio", "mps", "scratch", "g4tech"];
+var SITE_ORDER = ["pe", "warmup", "health", "imovie", "canva", "music", "studio", "mps", "scratch", "g4tech", "kss"];
 
 /* Backup cards live in backup-cards.js (loaded before this file). */
 var BACKUPS = window.SDP_BACKUP_CARDS || [];
@@ -74,7 +75,7 @@ if (DAY_KEYS.indexOf(currentDay) < 0) {
 var schedDay = currentDay;
 var plan = null;
 /* Plans are saved per date ("date:YYYY-MM-DD"). The weekday plans ("day:mon" …) are templates:
-   a new date starts from its weekday template, then Music, Health, PE and Grade 4 Tech blocks auto-fill. */
+   a new date starts from its weekday template, then Music, Health, PE, Grade 4 Tech and Kindergarten Social Studies blocks auto-fill. */
 var currentDate = "";
 var AF = window.SubAutofill || null, SY = window.SCHOOL_YEAR || null;
 function closedReason(iso) { return SY ? SY.closedReason(iso) : (/^(sun|sat)$/.test(weekdayKey(iso) || "") ? "Weekend" : null); }
@@ -172,7 +173,7 @@ function loadDatePlan(date) {
   applyAuto(p, date, wk);
   return p;
 }
-/* Fill Music / Health / PE / Grade 4 Tech blocks that the teacher hasn't edited. Notes are never touched. */
+/* Fill Music / Health / PE / Grade 4 Tech / Kindergarten Social Studies blocks that the teacher hasn't edited. Notes are never touched. */
 function applyAuto(p, date, wk) {
   if (!AF || !date) return;
   (schedule.days[wk].blocks || []).forEach(function (b) { autoBlock(p, b, date); });
@@ -232,12 +233,20 @@ function dutySwapFor(date) {
   })[0] || null;
 }
 function dayBlocks(day) {
-  var bl = (schedule.days[day] && schedule.days[day].blocks) || [], s = currentDate && weekdayKey(currentDate) === day ? dutySwapFor(currentDate) : null;
-  if (!s) return bl;
+  var bl = (schedule.days[day] && schedule.days[day].blocks) || [];
+  var date = currentDate && weekdayKey(currentDate) === day ? currentDate : "";
+  var s = date ? dutySwapFor(date) : null;
+  if (!s && !date) return bl;
   return bl.map(function (b) {
-    if (b.type !== "break") return b;
-    if (b.start === s.add) return Object.assign({}, b, { duty: s.duty, room: s.room });
-    if (b.start === s.remove && b.duty) return Object.assign({}, b, { duty: "", room: "" });
-    return b;
+    var out = b;
+    if (s && b.type === "break") {
+      if (b.start === s.add) out = Object.assign({}, b, { duty: s.duty, room: s.room });
+      else if (b.start === s.remove && b.duty) out = Object.assign({}, b, { duty: "", room: "" });
+    }
+    if (date && typeof window.socialClassFor === "function") {
+      var cls = window.socialClassFor(date, out, SY);
+      if (cls && cls !== out.cls) out = Object.assign({}, out, { cls: cls });
+    }
+    return out;
   });
 }

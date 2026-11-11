@@ -76,8 +76,8 @@ function renderAll() {
   var sum = currentDate && AF ? AF.daySummary(currentDate) : "";
   $("#daySummary").innerHTML = currentDate
     ? (currentDay === "wed" ? '<span class="badge short-badge">Short day · early dismissal</span> ' : "") + esc(sum) +
-      '<span class="day-summary-note">Music, Health, PE and Grade 4 Tech blocks are filled in from the lesson sites for this date. Edit anything; your changes are saved for this date only.</span>'
-    : "Weekday template: plans without a date. A new date starts from its weekday template, then Music, Health, PE and Grade 4 Tech fill in by themselves. Pick a date above to plan a real day.";
+      '<span class="day-summary-note">Music, Health, PE, Grade 4 Tech and Kindergarten Social Studies blocks are filled in from the lesson sites for this date. Edit anything; your changes are saved for this date only.</span>'
+    : "Weekday template: plans without a date. A new date starts from its weekday template, then Music, Health, PE, Grade 4 Tech and Kindergarten Social Studies fill in by themselves. Pick a date above to plan a real day.";
   $("#dateInput").value = currentDate || "";
   $("#dateHint").textContent = currentDate ? "Prints as " + fmtDate(currentDate) + "." : "No date picked: editing the " + DAY_LONG[currentDay] + " template.";
   if (startNote) { $("#dateHint").textContent = startNote + " " + $("#dateHint").textContent; startNote = ""; }

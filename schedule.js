@@ -77,8 +77,10 @@ window.DEFAULT_SCHEDULE = {
         { start: "9:04",  end: "9:31",  cls: "6A",       subject: "Library", room: "Library", type: "class" },
         { start: "9:31",  end: "9:58",  cls: "4C",       subject: "Tech",    room: "", type: "class", link: "g4tech" },
         { start: "9:58",  end: "10:13", cls: "",         subject: "Recess",  room: "", type: "break" },
-        { start: "10:13", end: "10:40", cls: "KA/KB",    subject: "Social",  room: "", type: "class" },
-        { start: "10:40", end: "11:07", cls: "KC/KD",    subject: "Social",  room: "", type: "class" },
+        /* Wednesday Social Studies: the template keeps both class pairs. On a picked date,
+           only the class that's on that school week is shown (see SOCIAL_ROTATION). */
+        { start: "10:13", end: "10:40", cls: "KA/KB",    subject: "Social",  room: "", type: "class", link: "kss" },
+        { start: "10:40", end: "11:07", cls: "KC/KD",    subject: "Social",  room: "", type: "class", link: "kss" },
         { start: "11:07", end: "11:31", cls: "5B",       subject: "PE",      room: "Gym", type: "class", link: "pe" },
         { start: "11:31", end: "11:52", cls: "",         subject: "Lunch",   room: "", type: "break" },
         { start: "11:52", end: "12:17", cls: "",         subject: "Recess",  room: "Library", type: "break", duty: "Library supervision duty" },
@@ -152,3 +154,26 @@ window.DUTY_SWAPS = [
     room: "Grade 3–4 area", duty: "Supervision duty (covering for Darren)",
     duties: "Supervision duty during the last recess, 1:59–2:14, in the Grade 3–4 area (covering for Darren). No Library supervision at the middle recess (until the Christmas Break)." }
 ];
+
+/*
+ * Wednesday Kindergarten Social Studies rotation (Mr. Fung, Nov 11 2026).
+ * Each class has Social once every two school weeks. School weeks are counted
+ * from school-year.js (not calendar weeks). The week of Wed Nov 18, 2026 is
+ * school week 11 (odd). That week and every second school week, forwards and
+ * backwards: 10:13–10:40 is KA and 10:40–11:07 is KC. The other school weeks:
+ * 10:13 is KB and 10:40 is KD. The weekly template itself stays KA/KB and KC/KD;
+ * a picked date shows only the class that's on.
+ */
+window.SOCIAL_ROTATION = {
+  odd:  { "10:13": "KA", "10:40": "KC" },
+  even: { "10:13": "KB", "10:40": "KD" }
+};
+window.socialClassFor = function (date, b, schoolYear) {
+  if (!date || !b || String(b.subject || "").toLowerCase() !== "social") return null;
+  var S = schoolYear || (typeof window !== "undefined" && window.SCHOOL_YEAR), st, week, map;
+  if (!S || typeof S.status !== "function" || (S.closedReason && S.closedReason(date))) return null;
+  st = S.status(date); week = st && st.week;
+  if (!week) return null;
+  map = (week.n % 2 === 1) ? window.SOCIAL_ROTATION.odd : window.SOCIAL_ROTATION.even;
+  return (map && map[b.start]) || null;
+};

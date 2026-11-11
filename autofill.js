@@ -1,8 +1,10 @@
-/* Auto-fill for Sub Day Plans: which Music, Health, PE and Grade 4 Tech lesson is taught on a date.
+/* Auto-fill for Sub Day Plans: which Music, Health, PE, Grade 4 Tech and Kindergarten Social Studies
+   lesson is taught on a date.
    Uses school-year.js (calendar), the PE Playbook's school-year.js (PE week plan) and
    lesson-catalog.js (lesson titles from the sites).
-   Grade 1 Music, Grade 5 Health, PE and Grade 4 Tech (4A, 4B, 4C) are filled. Social,
-   Library and Grade 6 Tech stay manual. Every filled block can still be edited, swapped or reset. */
+   Grade 1 Music, Grade 5 Health, PE, Grade 4 Tech (4A, 4B, 4C) and Kindergarten Social Studies
+   (Wednesday KA/KC or KB/KD) are filled. Library and Grade 6 Tech stay manual. Every filled
+   block can still be edited, swapped or reset. */
 (function () {
   "use strict";
   var BASE = "https://scaemrfung.github.io";
@@ -29,7 +31,7 @@
     var at = peWhere(ref);
     return at.name ? at.name + " (" + at.tag + ")" : at.tag;
   }
-  var CAT = function () { return window.LESSON_CATALOG || { health: {}, music: {}, pe: {}, kpe: [], g4tech: {} }; };
+  var CAT = function () { return window.LESSON_CATALOG || { health: {}, music: {}, pe: {}, kpe: [], g4tech: {}, kss: {} }; };
   /* Kindergarten PE (PE Playbook kindergarten.html): one 30-minute lesson a week. Lesson n goes with the n-th PE school
      week, start-up week and the 1-day last week left out, exactly as the Playbook's own build does. */
   function isK(cls) { return /^K[A-D]?$/i.test(String(cls || "").trim()); }
@@ -51,6 +53,7 @@
     if (s === "health" && /^5/.test(b.cls || "")) return "health";
     if (s === "pe") return "pe";
     if (s === "tech" && /^4[A-C]$/i.test(b.cls || "")) return "tech";
+    if (s === "social" && /K[A-D]/i.test(b.cls || "")) return "kss";
     return null;
   }
   function band(cls) {
@@ -108,6 +111,24 @@
     return 0;
   }
 
+  /* Kindergarten Social Studies (kindergarten-social-studies/school-year.js): one 30-minute
+     lesson every two school weeks. School weeks are counted from this site's school-year.js,
+     which matches that site's calendar. Lesson n is cycle n (school weeks 2n-1 and 2n).
+     Lessons 1–18 fill the first 18 cycles; school weeks 37–40 (June 7–28) are review and
+     reassessment of Lesson 18. Both classes in a fortnight get the same lesson. Wednesday
+     slots alternate by school week (see SOCIAL_ROTATION in schedule.js). */
+  function kssOf(date) {
+    var S = SY();
+    if (!date || !S || S.closedReason(date)) return null;
+    var st = S.status(date), week = st.week;
+    if (!week) return null;
+    var cycle = Math.ceil(week.n / 2), review = cycle > 18, n = review ? 18 : cycle;
+    if (!(CAT().kss || {})[n]) return null;
+    var weeks = S.weeks || [], a = weeks[2 * cycle - 2], b = weeks[2 * cycle - 1] || a;
+    var range = a && b ? (a.start === b.start ? (a.range || a.start) : (a.range || a.start) + " / " + (b.range || b.end)) : (week.range || "");
+    return { src: "kss", n: n, review: review, cycle: cycle, range: range, weekNote: short(week) };
+  }
+
   /* Default lesson reference for this block on this date (null = manual block). */
   function resolve(date, b, days) {
     var src = srcOf(b), S = SY();
@@ -140,6 +161,7 @@
       if (!tn || !(CAT().g4tech || {})[tn]) return null;
       return { src: "tech", n: tn, weekNote: short(week), range: week.range };
     }
+    if (src === "kss") return kssOf(date);
     var ref = { src: src, kind: st.kind, week: st.lesson || 1, weekNote: short(week), range: week.range, message: st.message || "" };
     if (src === "music") {
       var mp = nthInWeek(date, week, b, days);
@@ -257,9 +279,32 @@
       links: links
     };
   }
+  function kssContent(ref) {
+    var L = (CAT().kss || {})[ref.n] || {};
+    var url = BASE + "/kindergarten-social-studies/week/" + ref.n + "/";
+    var links = [{ label: "Kindergarten Social Studies · Lesson " + ref.n, url: url }];
+    if (L.chalkie) links.push({ label: "Lesson " + ref.n + " Chalkie slides", url: L.chalkie });
+    if (ref.review) links.push({ label: "Kindergarten Social Studies · Year map", url: BASE + "/kindergarten-social-studies/" });
+    var span = ref.range ? " — " + ref.range : "";
+    var head = ref.review
+      ? "Kindergarten Social Studies · Review and reassessment (Lesson 18" + (L.title ? ": " + L.title : "") + ")" + span
+      : "Kindergarten Social Studies · Lesson " + ref.n + (L.title ? ": " + L.title : "") + (L.unit ? " (" + L.unit + ")" : "") + span;
+    var reviewNote = ref.review
+      ? " All 18 lessons are done. Revisit any lesson, or reassess with Lesson 18. "
+      : " ";
+    return {
+      lesson: head,
+      materials: L.materials || "Materials and printables are in the Social Studies bin and linked on the lesson page.",
+      instructions: (ref.review ? reviewNote : "") + "This is a 30-minute Kindergarten Social Studies lesson (5 minutes warm-up, 10 minutes teach, 10 minutes activity, 5 minutes close). Open the Lesson " + ref.n + " page on the projector and follow the steps." +
+        (L.focus ? " Today's focus: " + L.focus : "") +
+        (L.sub ? " For a sub: " + L.sub : "") +
+        (ref.weekNote ? " " + ref.weekNote + "." : ""),
+      links: links
+    };
+  }
   function content(ref, b) {
     if (!ref) return null;
-    var c = ref.src === "music" ? musicContent(ref, b) : ref.src === "health" ? healthContent(ref, b) : ref.src === "tech" ? techContent(ref) : peContent(ref, b);
+    var c = ref.src === "music" ? musicContent(ref, b) : ref.src === "health" ? healthContent(ref, b) : ref.src === "tech" ? techContent(ref) : ref.src === "kss" ? kssContent(ref) : peContent(ref, b);
     c.lesson = c.lesson.replace(/\.\./g, "."); c.instructions = c.instructions.replace(/\.\.+/g, ".").replace(/\s+/g, " ").trim();
     return c;
   }
@@ -270,6 +315,10 @@
     if (ref.src === "tech") {
       var T = (CAT().g4tech || {})[ref.n] || {};
       return "Lesson " + ref.n + (T.title ? ": " + T.title : "");
+    }
+    if (ref.src === "kss") {
+      var K = (CAT().kss || {})[ref.n] || {};
+      return (ref.review ? "Review · " : "") + "Lesson " + ref.n + (K.title ? ": " + K.title : "");
     }
     if (ref.kind === "catchup") return "Catch-up (after Week " + ref.week + ")";
     if (ref.kind === "yearend") return "Last day";
@@ -284,6 +333,7 @@
       r.month = set[0]; r.w = +set[1] || 1; r.c = +v.c || 1; r.of = 4; r.planNote = "";
     }
     else if (src === "tech") { r.n = +v.n || 1; }
+    else if (src === "kss") { r.n = +v.n || 1; r.review = false; }
     else { r.kind = "lesson"; r.week = +v.week; if (src === "music") { r.cls = +v.cls; r.of = 3; } }
     return r;
   }
@@ -307,6 +357,14 @@
         to.push([n, "Lesson " + n + (L.kind === "flex" ? " (flex)" : "") + (t ? ": " + (t.length > 34 ? t.slice(0, 33) + "…" : t) : "") + (L.window ? " — " + L.window : "")]);
       }
       return sel("n", to, ref.n || 1, "Grade 4 Tech lesson");
+    }
+    if (src === "kss") {
+      var ko = [];
+      for (var kn = 1; kn <= 18; kn++) {
+        var KL = (CAT().kss || {})[kn] || {}, kt = KL.title || "";
+        ko.push([kn, "Lesson " + kn + (kt ? ": " + (kt.length > 34 ? kt.slice(0, 33) + "…" : kt) : "")]);
+      }
+      return sel("n", ko, ref.n || 1, "Kindergarten Social Studies lesson");
     }
     if (src === "pe" && ref.k) {
       var kw = kWeeks(), ko = (CAT().kpe || []).map(function (l, i) { var t = l[0]; return [i + 1, "Lesson " + (i + 1) + ": " + (t.length > 34 ? t.slice(0, 33) + "…" : t) + (kw[i] ? " (" + kMonLabel(kw[i]).replace("Week of ", "") + ")" : "")]; });
@@ -342,6 +400,11 @@
     if (p && p.month) parts.push("PE: " + peName({ month: p.planMonth, w: p.planW, calMonth: p.month, calW: p.w, startup: !!p.startup, name: p.name || "" }));
     var tn = techLessonNum(date), TL = (CAT().g4tech || {})[tn];
     if (tn && TL) parts.push("Grade 4 Tech: Lesson " + tn + (TL.title ? " — " + TL.title : ""));
+    var ks = kssOf(date);
+    if (ks) {
+      var KL = (CAT().kss || {})[ks.n] || {};
+      parts.push("K Social Studies: " + (ks.review ? "Review · " : "") + "Lesson " + ks.n + (KL.title ? " — " + KL.title : ""));
+    }
     if (w.note) parts.push(w.note);
     return parts.join(" · ");
   }

@@ -95,7 +95,7 @@ function bindEditor() {
   }
   $("#btnResetAll").addEventListener("click", function () {
     if (!currentDate) return;
-    if (!confirm("Reset every Music, Health, PE and Grade 4 Tech block on " + fmtDate(currentDate) + " to the auto-filled lesson? Edits, swaps and special activities in those blocks are removed. Notes and the rest of the day stay.")) return;
+    if (!confirm("Reset every Music, Health, PE, Grade 4 Tech and Kindergarten Social Studies block on " + fmtDate(currentDate) + " to the auto-filled lesson? Edits, swaps and special activities in those blocks are removed. Notes and the rest of the day stay.")) return;
     schedule.days[currentDay].blocks.forEach(function (b) { var bp = (plan.blocks || {})[blockKey(b)]; if (bp && (AF && AF.srcOf(b) || bp.special)) resetBlock(b); });
     savePlanNow(); renderBlocks(); renderPrint();
     toast("All blocks reset to auto-fill");
@@ -108,7 +108,7 @@ function bindEditor() {
   $("#copyFrom").addEventListener("change", function () {
     var from = this.value; this.value = "";
     if (!from) return;
-    if (!confirm("Replace " + (currentDate ? fmtDate(currentDate) : DAY_LONG[currentDay]) + "’s plan with a copy of the " + DAY_LONG[from] + " template? (The date stays." + (currentDate ? " Auto-filled Music, Health, PE and Grade 4 Tech lessons stay; their notes are copied." : "") + ")")) return;
+    if (!confirm("Replace " + (currentDate ? fmtDate(currentDate) : DAY_LONG[currentDay]) + "’s plan with a copy of the " + DAY_LONG[from] + " template? (The date stays." + (currentDate ? " Auto-filled Music, Health, PE, Grade 4 Tech and Kindergarten Social Studies lessons stay; their notes are copied." : "") + ")")) return;
     var src = loadPlan(from);
     copyPlanInto(src, from, { overwrite: true });
     toast("Copied from " + DAY_LONG[from]);

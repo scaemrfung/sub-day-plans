@@ -38,8 +38,17 @@ if(fs.existsSync(g4dir+"/content/lessons.py")){
   const prev={}; new Function("window",fs.readFileSync("lesson-catalog.js","utf8"))(prev);
   if(prev.LESSON_CATALOG&&prev.LESSON_CATALOG.g4tech) g4tech=prev.LESSON_CATALOG.g4tech;
 }
-const out={generated:new Date().toISOString().slice(0,10),health,music,pe,kpe,g4tech};
-console.log("kpe",kpe.length,Object.keys(health).length,Object.keys(music).length,Object.values(music).filter(x=>x.c).length,"g4tech",Object.keys(g4tech).length);
-const js="/* Lesson titles for auto-fill, copied from the lesson sites (Grade 5 Health, Grade 1 Music, PE Playbook, Grade 4 Tech).\n   Regenerate after big lesson changes (see README). */\nwindow.LESSON_CATALOG = "+JSON.stringify(out)+";\n";
+// Kindergarten Social Studies (optional): titles, focus, materials and sub notes
+let kss={};
+const kssdir=SRC+"/kindergarten-social-studies";
+if(fs.existsSync(kssdir+"/index.html")&&fs.existsSync("tools/extract-kss.py")){
+  kss=JSON.parse(execFileSync("python3",["tools/extract-kss.py",kssdir],{encoding:"utf8"}));
+}else if(fs.existsSync("lesson-catalog.js")){
+  const prev2={}; new Function("window",fs.readFileSync("lesson-catalog.js","utf8"))(prev2);
+  if(prev2.LESSON_CATALOG&&prev2.LESSON_CATALOG.kss) kss=prev2.LESSON_CATALOG.kss;
+}
+const out={generated:new Date().toISOString().slice(0,10),health,music,pe,kpe,g4tech,kss};
+console.log("kpe",kpe.length,Object.keys(health).length,Object.keys(music).length,Object.values(music).filter(x=>x.c).length,"g4tech",Object.keys(g4tech).length,"kss",Object.keys(kss).length);
+const js="/* Lesson titles for auto-fill, copied from the lesson sites (Grade 5 Health, Grade 1 Music, PE Playbook, Grade 4 Tech, Kindergarten Social Studies).\n   Regenerate after big lesson changes (see README). */\nwindow.LESSON_CATALOG = "+JSON.stringify(out)+";\n";
 fs.writeFileSync("lesson-catalog.js",js);
 console.log(js.length);
